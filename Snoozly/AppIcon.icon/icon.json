@@ -1,0 +1,53 @@
+{
+  "fill" : {
+    "solid" : "display-p3:0.09020,0.10196,0.18824,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "4_Face 3.svg",
+          "name" : "4_Face 3"
+        },
+        {
+          "image-name" : "3_Nightcap 3.svg",
+          "name" : "3_Nightcap 3"
+        },
+        {
+          "hidden" : true,
+          "image-name" : "2_Creature 3.svg",
+          "name" : "2_Creature 3"
+        },
+        {
+          "image-name" : "Group 6.svg",
+          "name" : "Group 6",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              -31.787000000000035,
+              100.29999999999995
+            ]
+          }
+        },
+        {
+          "image-name" : "1_Backdrop 1.svg",
+          "name" : "1_Backdrop 1"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.3
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
