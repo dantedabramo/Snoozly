@@ -1,0 +1,176 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "0AC806BF",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6822070712",
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_developerTeamID" : "KSWNYDHTKK",
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 814656040.28233099,
+    "_locale" : "en_US",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionBundleGroups" : [
+
+  ],
+  "subscriptionGroups" : [
+    {
+      "id" : "22508499",
+      "localizations" : [
+        {
+          "description" : "",
+          "displayName" : "Snoozly Pro",
+          "locale" : "en_CA"
+        }
+      ],
+      "name" : "Snoozly Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "billingPlans" : [
+            {
+              "billingPlanType" : "BILLED_UPFRONT",
+              "commitmentDisplayPrice" : "3.99",
+              "displayPrice" : "3.99",
+              "internalID" : "6826403294_BILLED_UPFRONT",
+              "isEnabled" : true
+            }
+          ],
+          "codeOffers" : [
+            {
+              "billingPlanType" : "BILLED_UPFRONT",
+              "eligibility" : [
+                "new"
+              ],
+              "internalID" : "a3a5edf8-d559-4cff-949b-430b3ebf5a20",
+              "isStackable" : false,
+              "numberOfPeriods" : 1,
+              "paymentMode" : "free",
+              "referenceName" : "Free 1 Month",
+              "subscriptionPeriod" : "P1M"
+            }
+          ],
+          "displayPrice" : "3.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6826403294",
+          "introductoryOffer" : {
+            "billingPlanType" : "BILLED_UPFRONT",
+            "internalID" : "eyJzIjoiNjgyNjQwMzI5NCIsImQiOjE3OTI3Mzg4MDAsImkiOiJVUyIsInQiOiIiLCJwIjoiMCJ9",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
+          "introductoryOffers" : [
+            {
+              "billingPlanType" : "BILLED_UPFRONT",
+              "internalID" : "eyJzIjoiNjgyNjQwMzI5NCIsImQiOjE3OTI3Mzg4MDAsImkiOiJVUyIsInQiOiIiLCJwIjoiMCJ9",
+              "numberOfPeriods" : 1,
+              "paymentMode" : "free",
+              "subscriptionPeriod" : "P3D"
+            }
+          ],
+          "localizations" : [
+            {
+              "description" : "Unlock all Snoozly Pro features with a monthly plan!",
+              "displayName" : "Snoozly Pro Monthly",
+              "locale" : "en_CA"
+            }
+          ],
+          "productID" : "snoozly_pro_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Snoozly Pro Monthly",
+          "subscriptionGroupID" : "22508499",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "billingPlans" : [
+            {
+              "billingPlanType" : "BILLED_UPFRONT",
+              "commitmentDisplayPrice" : "19.99",
+              "displayPrice" : "19.99",
+              "internalID" : "6826403358_BILLED_UPFRONT",
+              "isEnabled" : true
+            }
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "19.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "6826403358",
+          "introductoryOffer" : {
+            "billingPlanType" : "BILLED_UPFRONT",
+            "internalID" : "eyJzIjoiNjgyNjQwMzM1OCIsImQiOjE3OTI3Mzg4MDAsImkiOiJVUyIsInQiOiIiLCJwIjoiMCJ9",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
+          "introductoryOffers" : [
+            {
+              "billingPlanType" : "BILLED_UPFRONT",
+              "internalID" : "eyJzIjoiNjgyNjQwMzM1OCIsImQiOjE3OTI3Mzg4MDAsImkiOiJVUyIsInQiOiIiLCJwIjoiMCJ9",
+              "numberOfPeriods" : 1,
+              "paymentMode" : "free",
+              "subscriptionPeriod" : "P3D"
+            }
+          ],
+          "localizations" : [
+            {
+              "description" : "Unlock all Snoozly Pro features with a yearly plan!",
+              "displayName" : "Snoozly Pro Yearly",
+              "locale" : "en_CA"
+            }
+          ],
+          "productID" : "snoozly_pro_yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Snoozly Pro Yearly",
+          "subscriptionGroupID" : "22508499",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "subscriptionSuiteGroups" : [
+
+  ],
+  "version" : {
+    "major" : 6,
+    "minor" : 3
+  }
+}

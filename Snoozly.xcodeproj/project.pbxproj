@@ -6,14 +6,101 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D6834A3B3081AAAB00A12A6B /* DeviceActivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D6834A3A3081AAAB00A12A6B /* DeviceActivity.framework */; };
+		D6834A433081AAAB00A12A6B /* Snoozly_Activity_Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D6834A383081AAAB00A12A6B /* Snoozly_Activity_Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D6834A513081B66900A12A6B /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D6834A503081B66900A12A6B /* WidgetKit.framework */; };
+		D6834A533081B66900A12A6B /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D6834A523081B66900A12A6B /* SwiftUI.framework */; };
+		D6834A603081B66A00A12A6B /* Snoozly_Widget_Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D6834A4F3081B66900A12A6B /* Snoozly_Widget_Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D6834A413081AAAB00A12A6B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D63926A5307D50FE0062296F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D6834A373081AAAB00A12A6B;
+			remoteInfo = Snoozly_Activity_Extension;
+		};
+		D6834A5E3081B66A00A12A6B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D63926A5307D50FE0062296F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D6834A4E3081B66900A12A6B;
+			remoteInfo = Snoozly_Widget_Extension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D6834A443081AAAB00A12A6B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = PlugIns;
+			files = (
+				D6834A433081AAAB00A12A6B /* Snoozly_Activity_Extension.appex in Embed Foundation Extensions */,
+				D6834A603081B66A00A12A6B /* Snoozly_Widget_Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		D6250749308EAA24001731B5 /* Product.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; name = Product.storekit; path = Snoozly/Product.storekit; sourceTree = "<group>"; };
 		D63926AD307D50FE0062296F /* Snoozly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Snoozly.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D6834A383081AAAB00A12A6B /* Snoozly_Activity_Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = Snoozly_Activity_Extension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D6834A3A3081AAAB00A12A6B /* DeviceActivity.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DeviceActivity.framework; path = System/Library/Frameworks/DeviceActivity.framework; sourceTree = SDKROOT; };
+		D6834A4F3081B66900A12A6B /* Snoozly_Widget_Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = Snoozly_Widget_Extension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D6834A503081B66900A12A6B /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		D6834A523081B66900A12A6B /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D6834A473081AAAB00A12A6B /* Exceptions for "Snoozly_Activity_Extension" folder in "Snoozly_Activity_Extension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D6834A373081AAAB00A12A6B /* Snoozly_Activity_Extension */;
+		};
+		D6834A4A3081B61E00A12A6B /* Exceptions for "Snoozly" folder in "Snoozly" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D63926AC307D50FE0062296F /* Snoozly */;
+		};
+		D6834A643081B66A00A12A6B /* Exceptions for "Snoozly_Widget_Extension" folder in "Snoozly_Widget_Extension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D6834A4E3081B66900A12A6B /* Snoozly_Widget_Extension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D63926AF307D50FE0062296F /* Snoozly */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D6834A4A3081B61E00A12A6B /* Exceptions for "Snoozly" folder in "Snoozly" target */,
+			);
 			path = Snoozly;
+			sourceTree = "<group>";
+		};
+		D6834A3C3081AAAB00A12A6B /* Snoozly_Activity_Extension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D6834A473081AAAB00A12A6B /* Exceptions for "Snoozly_Activity_Extension" folder in "Snoozly_Activity_Extension" target */,
+			);
+			path = Snoozly_Activity_Extension;
+			sourceTree = "<group>";
+		};
+		D6834A543081B66900A12A6B /* Snoozly_Widget_Extension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D6834A643081B66A00A12A6B /* Exceptions for "Snoozly_Widget_Extension" folder in "Snoozly_Widget_Extension" target */,
+			);
+			path = Snoozly_Widget_Extension;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -24,13 +111,30 @@
 			files = (
 			);
 		};
+		D6834A353081AAAB00A12A6B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				D6834A3B3081AAAB00A12A6B /* DeviceActivity.framework in Frameworks */,
+			);
+		};
+		D6834A4C3081B66900A12A6B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				D6834A533081B66900A12A6B /* SwiftUI.framework in Frameworks */,
+				D6834A513081B66900A12A6B /* WidgetKit.framework in Frameworks */,
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		D63926A4307D50FE0062296F = {
 			isa = PBXGroup;
 			children = (
+				D6250749308EAA24001731B5 /* Product.storekit */,
 				D63926AF307D50FE0062296F /* Snoozly */,
+				D6834A3C3081AAAB00A12A6B /* Snoozly_Activity_Extension */,
+				D6834A543081B66900A12A6B /* Snoozly_Widget_Extension */,
+				D6834A393081AAAB00A12A6B /* Frameworks */,
 				D63926AE307D50FE0062296F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -39,8 +143,20 @@
 			isa = PBXGroup;
 			children = (
 				D63926AD307D50FE0062296F /* Snoozly.app */,
+				D6834A383081AAAB00A12A6B /* Snoozly_Activity_Extension.appex */,
+				D6834A4F3081B66900A12A6B /* Snoozly_Widget_Extension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D6834A393081AAAB00A12A6B /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D6834A3A3081AAAB00A12A6B /* DeviceActivity.framework */,
+				D6834A503081B66900A12A6B /* WidgetKit.framework */,
+				D6834A523081B66900A12A6B /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -53,16 +169,57 @@
 				D63926A9307D50FE0062296F /* Sources */,
 				D63926AA307D50FE0062296F /* Frameworks */,
 				D63926AB307D50FE0062296F /* Resources */,
+				D6834A443081AAAB00A12A6B /* Embed Foundation Extensions */,
 			);
 			buildRules = (
+			);
+			dependencies = (
+				D6834A423081AAAB00A12A6B /* PBXTargetDependency */,
+				D6834A5F3081B66A00A12A6B /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				D63926AF307D50FE0062296F /* Snoozly */,
 			);
 			name = Snoozly;
-			productName = Snoozle;
+			productName = Snoozly;
 			productReference = D63926AD307D50FE0062296F /* Snoozly.app */;
 			productType = "com.apple.product-type.application";
+		};
+		D6834A373081AAAB00A12A6B /* Snoozly_Activity_Extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D6834A483081AAAB00A12A6B /* Build configuration list for PBXNativeTarget "Snoozly_Activity_Extension" */;
+			buildPhases = (
+				D6834A343081AAAB00A12A6B /* Sources */,
+				D6834A353081AAAB00A12A6B /* Frameworks */,
+				D6834A363081AAAB00A12A6B /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				D6834A3C3081AAAB00A12A6B /* Snoozly_Activity_Extension */,
+			);
+			name = Snoozly_Activity_Extension;
+			productName = Snoozly_Activity_Extension;
+			productReference = D6834A383081AAAB00A12A6B /* Snoozly_Activity_Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		D6834A4E3081B66900A12A6B /* Snoozly_Widget_Extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D6834A613081B66A00A12A6B /* Build configuration list for PBXNativeTarget "Snoozly_Widget_Extension" */;
+			buildPhases = (
+				D6834A4B3081B66900A12A6B /* Sources */,
+				D6834A4C3081B66900A12A6B /* Frameworks */,
+				D6834A4D3081B66900A12A6B /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				D6834A543081B66900A12A6B /* Snoozly_Widget_Extension */,
+			);
+			name = Snoozly_Widget_Extension;
+			productName = Snoozly_Widget_Extension;
+			productReference = D6834A4F3081B66900A12A6B /* Snoozly_Widget_Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -72,9 +229,15 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2700;
-				LastUpgradeCheck = 2700;
+				LastUpgradeCheck = 2710;
 				TargetAttributes = {
 					D63926AC307D50FE0062296F = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					D6834A373081AAAB00A12A6B = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					D6834A4E3081B66900A12A6B = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -94,12 +257,24 @@
 			projectRoot = "";
 			targets = (
 				D63926AC307D50FE0062296F /* Snoozly */,
+				D6834A373081AAAB00A12A6B /* Snoozly_Activity_Extension */,
+				D6834A4E3081B66900A12A6B /* Snoozly_Widget_Extension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		D63926AB307D50FE0062296F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		D6834A363081AAAB00A12A6B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		D6834A4D3081B66900A12A6B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -112,7 +287,30 @@
 			files = (
 			);
 		};
+		D6834A343081AAAB00A12A6B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		D6834A4B3081B66900A12A6B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D6834A423081AAAB00A12A6B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D6834A373081AAAB00A12A6B /* Snoozly_Activity_Extension */;
+			targetProxy = D6834A413081AAAB00A12A6B /* PBXContainerItemProxy */;
+		};
+		D6834A5F3081B66A00A12A6B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D6834A4E3081B66900A12A6B /* Snoozly_Widget_Extension */;
+			targetProxy = D6834A5E3081B66A00A12A6B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		D63926B6307D50FE0062296F /* Debug configuration for PBXProject "Snoozly" */ = {
@@ -174,6 +372,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -231,6 +430,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -241,23 +441,27 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Snoozly/Snoozly.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = KSWNYDHTKK;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Snoozly/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Snoozly;
+				INFOPLIST_KEY_NSAlarmKitUsageDescription = "Snoozly rings the wake-up alarm you choose, even when your phone is silent.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dantedabramo.Snoozly;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -270,7 +474,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -279,23 +483,27 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Snoozly/Snoozly.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = KSWNYDHTKK;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Snoozly/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Snoozly;
+				INFOPLIST_KEY_NSAlarmKitUsageDescription = "Snoozly rings the wake-up alarm you choose, even when your phone is silent.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dantedabramo.Snoozly;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -308,7 +516,151 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D6834A453081AAAB00A12A6B /* Debug configuration for PBXNativeTarget "Snoozly_Activity_Extension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Snoozly_Activity_Extension/Snoozly_Activity_Extension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = KSWNYDHTKK;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Snoozly_Activity_Extension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Snoozly_Activity_Extension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.dantedabramo.Snoozly.Activity-Extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D6834A463081AAAB00A12A6B /* Release configuration for PBXNativeTarget "Snoozly_Activity_Extension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Snoozly_Activity_Extension/Snoozly_Activity_Extension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = KSWNYDHTKK;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Snoozly_Activity_Extension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Snoozly_Activity_Extension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.dantedabramo.Snoozly.Activity-Extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D6834A623081B66A00A12A6B /* Debug configuration for PBXNativeTarget "Snoozly_Widget_Extension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = Snoozly_Widget_Extension/Snoozly_Widget_Extension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = KSWNYDHTKK;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Snoozly_Widget_Extension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Snoozly_Widget_Extension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.dantedabramo.Snoozly.Snoozly-Widget-Extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D6834A633081B66A00A12A6B /* Release configuration for PBXNativeTarget "Snoozly_Widget_Extension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = Snoozly_Widget_Extension/Snoozly_Widget_Extension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = KSWNYDHTKK;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Snoozly_Widget_Extension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Snoozly_Widget_Extension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.dantedabramo.Snoozly.Snoozly-Widget-Extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -328,6 +680,22 @@
 			buildConfigurations = (
 				D63926B9307D50FE0062296F /* Debug configuration for PBXNativeTarget "Snoozly" */,
 				D63926BA307D50FE0062296F /* Release configuration for PBXNativeTarget "Snoozly" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		D6834A483081AAAB00A12A6B /* Build configuration list for PBXNativeTarget "Snoozly_Activity_Extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6834A453081AAAB00A12A6B /* Debug configuration for PBXNativeTarget "Snoozly_Activity_Extension" */,
+				D6834A463081AAAB00A12A6B /* Release configuration for PBXNativeTarget "Snoozly_Activity_Extension" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		D6834A613081B66A00A12A6B /* Build configuration list for PBXNativeTarget "Snoozly_Widget_Extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6834A623081B66A00A12A6B /* Debug configuration for PBXNativeTarget "Snoozly_Widget_Extension" */,
+				D6834A633081B66A00A12A6B /* Release configuration for PBXNativeTarget "Snoozly_Widget_Extension" */,
 			);
 			defaultConfigurationName = Release;
 		};

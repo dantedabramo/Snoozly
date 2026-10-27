@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Snoozly rings the wake-up alarm at the time you choose, even when your phone is silent.</string>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>sunrise.fill</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Morning Check-In</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.dantedabramo.Snoozly.checkIn</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>calendar</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Edit Schedule</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.dantedabramo.Snoozly.schedule</string>
+		</dict>
+	</array>
+</dict>
+</plist>

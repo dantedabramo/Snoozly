@@ -1,6 +1,6 @@
 //
 //  SplashView.swift
-//  Snoozle
+//  Snoozly
 //
 //  Created by Dante D’Abramo on 2026-10-12.
 //
@@ -8,9 +8,7 @@
 import SwiftUI
 
 struct SplashView: View {
-
     var hold: Double = 3.0
-
     var onFinish: () -> Void = {}
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -64,7 +62,7 @@ struct SplashView: View {
         .sensoryFeedback(.selection, trigger: wordIn)
         .sensoryFeedback(.success, trigger: taglineIn)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Snoozle")
+        .accessibilityLabel("Snoozly")
     }
 
     // MARK: - Intro timeline
@@ -128,12 +126,11 @@ struct SplashView: View {
                 endPoint: .bottom
             )
 
-            // Slow-drifting aurora glows
-            glow(.dreamPurple, opacity: 0.34, diameter: 440)
+            GlowOrb(color: .dreamPurple, opacity: 0.34, diameter: 440)
                 .offset(x: sin(t * 0.35) * 50 - 70, y: cos(t * 0.27) * 40 - 230)
-            glow(.moonlightBlue, opacity: 0.16, diameter: 380)
+            GlowOrb(color: .moonlightBlue, opacity: 0.16, diameter: 380)
                 .offset(x: cos(t * 0.30) * 60 + 110, y: sin(t * 0.22) * 50 + 260)
-            glow(.dreamCoral, opacity: 0.10, diameter: 320)
+            GlowOrb(color: .dreamCoral, opacity: 0.10, diameter: 320)
                 .offset(x: sin(t * 0.25 + 1) * 40 - 130, y: cos(t * 0.33) * 40 + 190)
 
             Canvas { context, size in
@@ -151,19 +148,6 @@ struct SplashView: View {
         }
     }
 
-    private func glow(_ color: Color, opacity: Double, diameter: CGFloat) -> some View {
-        Circle()
-            .fill(
-                RadialGradient(
-                    colors: [color.opacity(opacity), color.opacity(0)],
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: diameter / 2
-                )
-            )
-            .frame(width: diameter, height: diameter)
-    }
-
     // MARK: - Sky drawing
     private func drawSky(_ context: inout GraphicsContext, size: CGSize, t: Double, keepOut: CGRect) {
         for star in stars {
@@ -177,7 +161,6 @@ struct SplashView: View {
                               width: star.radius * 2, height: star.radius * 2)
             context.fill(Path(ellipseIn: rect), with: .color(color))
         }
-
     }
 
     private func shootingStarOverlay(t: Double, size: CGSize) -> some View {
@@ -355,7 +338,6 @@ private struct Star {
     let phase: Double
     let speed: Double
     let base: Double
-    let isSparkle: Bool
     let color: Color
 
     static func makeField(count: Int) -> [Star] {
@@ -363,30 +345,16 @@ private struct Star {
         let palette: [Color] = [.starlightGold, .lavendar, .moonlightBlue, .white]
 
         return (0..<count).map { _ in
-            let sparkle = false
-            return Star(
+            Star(
                 x: .random(in: 0...1, using: &rng),
                 y: .random(in: 0...1, using: &rng),
-                radius: sparkle ? CGFloat.random(in: 4...8, using: &rng) : CGFloat.random(in: 0.7...1.7, using: &rng),
-                phase: Double.random(in: 0...(2 * Double.pi), using: &rng),
+                radius: .random(in: 0.7...1.7, using: &rng),
+                phase: .random(in: 0...(2 * Double.pi), using: &rng),
                 speed: .random(in: 0.8...2.4, using: &rng),
                 base: .random(in: 0.15...0.45, using: &rng),
-                isSparkle: sparkle,
                 color: palette.randomElement(using: &rng) ?? .white
             )
         }
-    }
-}
-
-private struct SeededGenerator: RandomNumberGenerator {
-    var state: UInt64
-
-    mutating func next() -> UInt64 {
-        state &+= 0x9E37_79B9_7F4A_7C15
-        var z = state
-        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
-        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
-        return z ^ (z >> 31)
     }
 }
 
