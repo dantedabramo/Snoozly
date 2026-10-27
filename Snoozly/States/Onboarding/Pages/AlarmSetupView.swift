@@ -14,8 +14,6 @@ struct AlarmSetupView: View {
 
     private let snoozeRows: [[Int]] = [[0, 1, 2, 3], [4, 5, 10, 15]]
 
-    private var nights: [NightPlan] { plan.sortedNights }
-
     var body: some View {
         OnboardingPageContainer(centersContent: true) {
             VStack(alignment: .leading, spacing: 16) {
@@ -48,15 +46,15 @@ struct AlarmSetupView: View {
                     .font(.system(.title3, design: .rounded, weight: .bold))
                     .foregroundStyle(.white)
 
-                Text("Rings the morning after each night.")
+                Text("Scheduled for each morning.")
                     .font(.system(.footnote, design: .rounded))
                     .foregroundStyle(Color.lavendar.opacity(0.7))
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             HStack(spacing: 6) {
-                ForEach(nights) { night in
-                    nightPill(night)
+                ForEach(Weekday.allCases) { morning in
+                    morningPill(morning)
                 }
             }
         }
@@ -65,16 +63,16 @@ struct AlarmSetupView: View {
         .nightCard(cornerRadius: 28)
     }
 
-    private func nightPill(_ night: NightPlan) -> some View {
-        let isOn = night.isEnabled && night.alarmEnabled
-        let day = night.weekday
+    private func morningPill(_ morning: Weekday) -> some View {
+        let night = plan.night(forMorning: morning)
+        let isOn = (night?.isEnabled == true) && (night?.alarmEnabled == true)
         let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
         return VStack(spacing: 6) {
-            Text(day.initial)
+            Text(morning.initial)
                 .font(.system(.headline, design: .rounded, weight: .heavy))
 
-            if isOn {
+            if isOn, let night {
                 Text(night.wakeMinutes.compactClockText)
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .monospacedDigit()
@@ -104,8 +102,8 @@ struct AlarmSetupView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: day.fullName))
-        .accessibilityValue(isOn ? Text(verbatim: night.wakeMinutes.clockText) : Text("No alarm"))
+        .accessibilityLabel(Text(verbatim: morning.fullName))
+        .accessibilityValue(isOn && night != nil ? Text(verbatim: night!.wakeMinutes.clockText) : Text("No alarm"))
     }
 
     // MARK: - Snooze
@@ -168,18 +166,18 @@ struct AlarmSetupView: View {
                         .overlay {
                             shape.strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
                         }
-                        .shadow(color: Color.dreamPurple.opacity(0.5), radius: 8, y: 3)
+                        .shadow(color: Color.dreamPurple.opacity(0.4), radius: 8, y: 3)
                 } else {
                     shape
-                        .fill(Color.white.opacity(0.07))
+                        .fill(Color.white.opacity(0.04))
                         .overlay {
                             shape.strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
                         }
                 }
             }
-            .contentShape(shape)
         }
         .buttonStyle(PressScaleButtonStyle())
+        .accessibilityLabel(minutes == 0 ? Text("Snooze off") : Text("\(minutes) minute snooze"))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
@@ -190,7 +188,5 @@ struct AlarmSetupView: View {
     ZStack {
         NightBackground()
         AlarmSetupView(plan: preview.plan, isActive: true)
-            .padding()
     }
-    .modelContainer(preview.container)
 }

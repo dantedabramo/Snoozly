@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import UIKit
 import UserNotifications
 import os
 
@@ -88,10 +87,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             plan.notificationsEnabled = granted
             return granted ? .allowed : .denied
         case .denied:
-            plan.notificationsEnabled = false
-            if let url = URL(string: UIApplication.openSettingsURLString) {
-                _ = await UIApplication.shared.open(url)
-            }
+            plan.notificationsEnabled = true
             return .denied
         }
     }
@@ -122,7 +118,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     private func makeRequests(for plan: SleepPlan) -> [UNNotificationRequest] {
         var requests: [UNNotificationRequest] = []
 
-        for night in plan.sortedNights where night.isEnabled {
+        for night in plan.sortedNights where night.isEnabled && night.remindersEnabled {
             let bedtimeText = night.bedtimeMinutes.clockText
 
             requests.append(makeRequest(

@@ -67,7 +67,7 @@ struct ReviewView: View {
     // MARK: - Week
 
     private var weekCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("This week")
@@ -108,11 +108,18 @@ struct ReviewView: View {
     }
 
     private func nightRow(_ night: NightPlan) -> some View {
-        HStack(spacing: 10) {
-            Text(night.weekday.shortName)
-                .font(.system(.footnote, design: .rounded, weight: .bold))
-                .foregroundStyle(night.isEnabled ? Color.lavendar : Color.white.opacity(0.35))
-                .frame(width: 40, alignment: .leading)
+        HStack(spacing: 8) {
+            HStack(spacing: 2) {
+                Text(night.weekday.shortName)
+                    .foregroundStyle(night.isEnabled ? Color.lavendar : Color.white.opacity(0.35))
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Color.lavendar.opacity(0.5))
+                Text(night.weekday.nextMorning.shortName)
+                    .foregroundStyle(night.isEnabled ? .white : Color.white.opacity(0.35))
+            }
+            .font(.system(.footnote, design: .rounded, weight: .bold))
+            .frame(width: 74, alignment: .leading)
 
             if night.isEnabled {
                 Text("\(night.bedtimeMinutes.clockText) → \(night.wakeMinutes.clockText)")
@@ -122,7 +129,7 @@ struct ReviewView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
-                Spacer(minLength: 6)
+                Spacer(minLength: 4)
 
                 Text(night.sleepMinutes.durationText)
                     .font(.system(.caption, design: .rounded, weight: .medium))
@@ -227,8 +234,5 @@ struct ReviewView: View {
     ZStack {
         NightBackground()
         ReviewView(plan: preview.plan, isActive: true, goTo: { _ in })
-            .padding()
     }
-    .modelContainer(preview.container)
 }
-

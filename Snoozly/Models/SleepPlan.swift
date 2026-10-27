@@ -77,6 +77,10 @@ extension SleepPlan {
         nights.sorted { $0.weekdayIndex < $1.weekdayIndex }
     }
 
+    func night(forMorning morning: Weekday) -> NightPlan? {
+        nights.first { $0.weekday == morning.nightBefore }
+    }
+
     var averageSleepMinutes: Int? {
         let active = sortedNights.filter { $0.isEnabled }
         guard !active.isEmpty else { return nil }

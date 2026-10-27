@@ -2,8 +2,7 @@
 //  QuietAppsPicker.swift
 //  Snoozly
 //
-//  One app picker that Settings, Schedule and Tonight all use, so choosing apps
-//  anywhere switches Quiet Apps on and keeps every screen in agreement.
+//  Created by Dante D’Abramo on 2026-10-27.
 //
 
 import SwiftUI

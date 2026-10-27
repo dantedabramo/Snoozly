@@ -198,29 +198,169 @@ struct StatusCapsule: View {
 }
 
 struct AccessPill: View {
-    let isAllowed: Bool
+    let kind: PermissionKind
+    let status: PermissionStatus
+    var isBusy: Bool = false
+    var action: () -> Void
+
+    private var tint: Color {
+        switch status {
+        case .granted: Color.restfulMint
+        case .notDetermined: Color.midnightNavy
+        case .denied: Color.dreamCoral
+        case .failed: Color.lavendar
+        }
+    }
+
+    var body: some View {
+        if status == .granted {
+            label
+                .background(Capsule().fill(Color.restfulMint.opacity(0.14)))
+                .accessibilityElement(children: .combine)
+        } else {
+            Button(action: action) {
+                label
+                    .background {
+                        switch status {
+                        case .notDetermined:
+                            Capsule().fill(NightGradient.gold)
+                        case .denied:
+                            Capsule()
+                                .fill(Color.dreamCoral.opacity(0.16))
+                                .overlay { Capsule().strokeBorder(Color.dreamCoral.opacity(0.5), lineWidth: 1) }
+                        default:
+                            Capsule()
+                                .fill(Color.lavendar.opacity(0.12))
+                                .overlay { Capsule().strokeBorder(Color.lavendar.opacity(0.4), lineWidth: 1) }
+                        }
+                    }
+            }
+            .buttonStyle(PressScaleButtonStyle())
+            .disabled(isBusy)
+        }
+    }
+
+    private var label: some View {
+        HStack(spacing: 5) {
+            if isBusy {
+                SwiftUI.ProgressView()
+                    .controlSize(.mini)
+                    .tint(tint)
+            } else {
+                Text(kind.actionTitle(for: status))
+                    .font(.system(.caption, design: .rounded, weight: .bold))
+
+                Image(systemName: kind.actionSymbol(for: status))
+                    .font(.system(size: 11, weight: .bold))
+            }
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .frame(minHeight: 30)
+    }
+}
+
+// MARK: - PermissionRow
+
+struct PermissionRow: View {
+    let icon: String
+    let title: LocalizedStringKey
+    let tint: Color
+    let kind: PermissionKind
+    let status: PermissionStatus
+    var isBusy: Bool = false
+    var action: () -> Void
+    var openSettings: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SettingsRow(icon: icon, title: title, subtitle: kind.detail(for: status), tint: tint) {
+                AccessPill(kind: kind, status: status, isBusy: isBusy, action: action)
+            }
+
+            if status == .denied && !kind.recoversInSettings {
+                Button(action: openSettings) {
+                    Text("Open Settings")
+                        .font(.system(.footnote, design: .rounded, weight: .semibold))
+                        .foregroundStyle(Color.lavendar)
+                        .frame(minHeight: 32, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 48)
+            }
+        }
+        .animation(.snappy, value: status)
+    }
+}
+
+// MARK: - LegalLink
+
+struct LegalLink: View {
+    let title: LocalizedStringKey
+    let url: URL?
+
+    var body: some View {
+        if let url {
+            Link(title, destination: url)
+        } else {
+            Button(title) {}
+                .buttonStyle(.plain)
+        }
+    }
+}
+
+// MARK: - AccessNotice
+
+struct AccessNotice: View {
+    let message: LocalizedStringKey
+    let actionTitle: LocalizedStringKey
+    var isBusy: Bool = false
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Text(isAllowed ? "Allowed" : "Allow")
-                    .font(.system(.caption, design: .rounded, weight: .bold))
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.dreamCoral)
+                .accessibilityHidden(true)
 
-                Image(systemName: isAllowed ? "checkmark" : "arrow.up.forward.app")
-                    .font(.system(size: 11, weight: .bold))
-            }
-            .foregroundStyle(isAllowed ? Color.restfulMint : Color.midnightNavy)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background {
-                if isAllowed {
-                    Capsule().fill(Color.restfulMint.opacity(0.14))
-                } else {
-                    Capsule().fill(NightGradient.gold)
+            Text(message)
+                .font(.system(.footnote, design: .rounded, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.9))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 6)
+
+            Button(action: action) {
+                Group {
+                    if isBusy {
+                        SwiftUI.ProgressView()
+                            .controlSize(.mini)
+                            .tint(Color.midnightNavy)
+                    } else {
+                        Text(actionTitle)
+                    }
                 }
+                .font(.system(.caption, design: .rounded, weight: .heavy))
+                .foregroundStyle(Color.midnightNavy)
+                .padding(.horizontal, 12)
+                .frame(minWidth: 44, minHeight: 32)
+                .background(Capsule().fill(Color.dreamCoral))
             }
+            .buttonStyle(PressScaleButtonStyle())
+            .disabled(isBusy)
         }
-        .buttonStyle(PressScaleButtonStyle())
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.dreamCoral.opacity(0.12))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.dreamCoral.opacity(0.35), lineWidth: 1)
+                }
+        }
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 }

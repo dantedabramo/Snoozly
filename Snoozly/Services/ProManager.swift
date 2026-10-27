@@ -33,6 +33,7 @@ final class ProManager {
         case success
         case cancelled
         case pending
+        case unverified
         case failed
     }
 
@@ -49,11 +50,13 @@ final class ProManager {
     private(set) var activeProductID: String?
     private(set) var activeTransactionID: UInt64?
     private(set) var storeEnvironment: String?
-    var errorMessage: String?
 
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
     @ObservationIgnored private var activeTask: Task<Void, Never>?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
+
+    @ObservationIgnored private var statusGeneration = 0
+    @ObservationIgnored private var recentTransaction: StoreKit.Transaction?
 
     private init() {
         isPro = UserDefaults.standard.bool(forKey: AppStorageKey.isPro)
@@ -221,6 +224,16 @@ final class ProManager {
         return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 
+    static func redeemMessage(for error: Error) -> String? {
+        guard !isCancellation(error) else { return nil }
+        return "That code couldn't be redeemed. Check it and try again."
+    }
+
+    static func purchaseMessage(for error: Error) -> String? {
+        guard !isCancellation(error) else { return nil }
+        return friendlyMessage(for: error)
+    }
+
     private static func friendlyMessage(for error: Error) -> String {
         if let storeError = error as? StoreKitError {
             switch storeError {
@@ -265,13 +278,12 @@ final class ProManager {
         case .success(let verification):
             switch verification {
             case .verified(let transaction):
+                recentTransaction = transaction
                 await transaction.finish()
                 await updatePurchasedStatus()
-                errorMessage = nil
                 return .success
             case .unverified:
-                errorMessage = "We couldn't verify that purchase. Please try again or restore purchases."
-                return .failed
+                return .unverified
             }
         case .userCancelled:
             return .cancelled
@@ -282,21 +294,19 @@ final class ProManager {
         }
     }
 
-    func restorePurchases() async {
-        guard !isRestoring else { return }
+    @discardableResult
+    func restorePurchases() async -> String? {
+        guard !isRestoring else { return nil }
         isRestoring = true
-        errorMessage = nil
         defer { isRestoring = false }
 
         do {
             try await AppStore.sync()
             await updatePurchasedStatus()
-            if !isPro {
-                errorMessage = "No active Snoozly Pro subscription was found for this Apple Account."
-            }
+            return isPro ? nil : "No active Snoozly Pro subscription was found for this Apple Account."
         } catch {
-            guard !Self.isCancellation(error) else { return }
-            errorMessage = Self.friendlyMessage(for: error)
+            guard !Self.isCancellation(error) else { return nil }
+            return Self.friendlyMessage(for: error)
         }
     }
 
@@ -306,6 +316,7 @@ final class ProManager {
         updatesTask = Task { [weak self] in
             for await result in StoreKit.Transaction.updates {
                 if case .verified(let transaction) = result {
+                    self?.noteTransaction(transaction)
                     await transaction.finish()
                 }
                 await self?.updatePurchasedStatus()
@@ -321,28 +332,55 @@ final class ProManager {
         }
     }
 
+    private func noteTransaction(_ transaction: StoreKit.Transaction) {
+        guard Self.productIDs.contains(transaction.productID) else { return }
+        recentTransaction = transaction.revocationDate == nil ? transaction : nil
+    }
+
+    private static func isActive(_ transaction: StoreKit.Transaction) -> Bool {
+        guard productIDs.contains(transaction.productID),
+              transaction.revocationDate == nil else { return false }
+        if let expiration = transaction.expirationDate, expiration < .now { return false }
+        return true
+    }
+
     func updatePurchasedStatus() async {
+        statusGeneration += 1
+        let generation = statusGeneration
+
         var current: StoreKit.Transaction?
 
         for await result in StoreKit.Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result,
-                  Self.productIDs.contains(transaction.productID),
-                  transaction.revocationDate == nil else { continue }
-            if let expiration = transaction.expirationDate, expiration < .now { continue }
+            guard case .verified(let transaction) = result, Self.isActive(transaction) else { continue }
+            if let best = current,
+               (best.expirationDate ?? .distantFuture) >= (transaction.expirationDate ?? .distantFuture) {
+                continue
+            }
             current = transaction
-            break
         }
+
+        if current == nil, let recent = recentTransaction, Self.isActive(recent) {
+            current = recent
+        }
+
+        var renews = true
+        if let current {
+            renews = await autoRenewState(for: current)
+        }
+
+        guard generation == statusGeneration else { return }
 
         if let current {
             activeProductID = current.productID
             activeTransactionID = current.id
             renewalDate = current.expirationDate
-            willAutoRenew = await autoRenewState(for: current)
+            willAutoRenew = renews
         } else {
             activeProductID = nil
             activeTransactionID = nil
             renewalDate = nil
             willAutoRenew = true
+            recentTransaction = nil
         }
 
         isPro = current != nil

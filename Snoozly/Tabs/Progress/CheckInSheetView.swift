@@ -139,7 +139,7 @@ struct CheckInSheetView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("How do you feel?")
 
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 ForEach(SleepFeel.allCases) { option in
                     let isSelected = feel == option
 
@@ -148,20 +148,28 @@ struct CheckInSheetView: View {
                             feel = option
                         }
                     } label: {
-                        VStack(spacing: 7) {
-                            Image(systemName: option.icon)
-                                .font(.system(size: 21, weight: .semibold))
-                                .symbolEffect(.bounce, value: isSelected)
+                        VStack(spacing: 8) {
+                            ZStack {
+                                Circle()
+                                    .fill(isSelected ? Color.midnightNavy.opacity(0.14) : Color.white.opacity(0.08))
+                                    .frame(width: 34, height: 34)
+
+                                Image(systemName: option.icon)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .symbolEffect(.bounce, value: isSelected)
+                            }
 
                             Text(option.rawValue)
                                 .font(.system(size: 11, weight: .bold, design: .rounded))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
+                                .padding(.horizontal, 2)
                         }
                         .foregroundStyle(isSelected ? Color.midnightNavy : Color.white)
-                        .frame(maxWidth: .infinity, minHeight: 72)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
                         .background {
-                            selectionBackground(isSelected: isSelected, cornerRadius: 18)
+                            selectionBackground(isSelected: isSelected, cornerRadius: 16)
                         }
                     }
                     .buttonStyle(PressScaleButtonStyle())
@@ -170,7 +178,8 @@ struct CheckInSheetView: View {
             }
             .sensoryFeedback(.selection, trigger: feel)
         }
-        .padding(18)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 16)
         .nightCard(cornerRadius: 28)
     }
 
@@ -237,14 +246,14 @@ struct CheckInSheetView: View {
 
             HStack(spacing: 12) {
                 stepButton(systemImage: "minus") {
-                    hours = max(3, hours - 0.5)
+                    hours = max(1, hours - 0.5)
                 }
 
-                Slider(value: $hours, in: 3...12, step: 0.5)
+                Slider(value: $hours, in: 1...14, step: 0.5)
                     .tint(Color.dreamPurple)
 
                 stepButton(systemImage: "plus") {
-                    hours = min(12, hours + 0.5)
+                    hours = min(14, hours + 0.5)
                 }
             }
             .sensoryFeedback(.selection, trigger: hours)
@@ -402,7 +411,7 @@ struct CheckInSheetView: View {
         if let existing = target {
             feel = existing.feelValue ?? .good
             quality = existing.qualityValue ?? .sound
-            hours = min(12, max(3, (existing.hoursSlept * 2).rounded() / 2))
+            hours = min(14, max(1, (existing.hoursSlept * 2).rounded() / 2))
             factors = Set(existing.factors)
             notes = existing.notes
             return
@@ -411,7 +420,7 @@ struct CheckInSheetView: View {
         if let planned = plannedSleepHours {
             hours = planned
         } else {
-            hours = min(12, max(3, goalHours))
+            hours = min(14, max(1, goalHours))
         }
     }
 
@@ -420,7 +429,7 @@ struct CheckInSheetView: View {
         let lastNight = Weekday.today.shifted(by: -1)
         guard let night = plan.sortedNights.first(where: { $0.weekday == lastNight }), night.isEnabled else { return nil }
         let rounded = (Double(night.sleepMinutes) / 60 * 2).rounded() / 2
-        return min(12, max(3, rounded))
+        return min(14, max(1, rounded))
     }
 
     private func save() {

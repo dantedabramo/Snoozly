@@ -21,6 +21,7 @@ struct NightTimeCard: View {
     let applyToAllTitle: LocalizedStringKey
     let onApplyToAll: () -> Void
     var alarm: Binding<Bool>? = nil
+    var showsEnabledToggle: Bool = true
 
     @State private var applyCount = 0
     @Environment(\.onboardingDense) private var dense
@@ -106,11 +107,13 @@ struct NightTimeCard: View {
                 .accessibilityLabel("More")
             }
 
-            Toggle(isOn: $isEnabled) {
-                Text(title)
+            if showsEnabledToggle {
+                Toggle(isOn: $isEnabled) {
+                    Text(title)
+                }
+                .labelsHidden()
+                .tint(Color.dreamPurple)
             }
-            .labelsHidden()
-            .tint(Color.dreamPurple)
         }
     }
 

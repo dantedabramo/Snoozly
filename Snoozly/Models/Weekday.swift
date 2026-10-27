@@ -22,6 +22,12 @@ enum Weekday: Int, CaseIterable, Identifiable {
 
     var isLateNight: Bool { self == .friday || self == .saturday }
 
+    var isWeekendMorning: Bool { self == .saturday || self == .sunday }
+    var isWeekdayMorning: Bool { !isWeekendMorning }
+
+    var nightBefore: Weekday { shifted(by: -1) }
+    var nextMorning: Weekday { shifted(by: 1) }
+
     func shifted(by days: Int) -> Weekday {
         Weekday(rawValue: ((rawValue + days) % 7 + 7) % 7) ?? self
     }

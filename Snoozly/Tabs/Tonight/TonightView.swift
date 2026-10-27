@@ -23,9 +23,7 @@ struct TonightView: View {
     @State private var upcomingSelection: UpcomingSelection?
     @State private var showQuietPicker = false
     @State private var sheetWeekday: Weekday = .today
-    @State private var reminderAccess: NotificationManager.Access = .notDetermined
-    @State private var alarmPermission = WakeAlarmService.permission
-    @State private var screenTimeAllowed = ScreenTimeService.isAuthorized
+    @State private var permissions = PermissionCenter.shared
     @State private var appeared = false
     @ScaledMetric(relativeTo: .largeTitle) private var heroTimeSize: CGFloat = 48
 
@@ -162,7 +160,7 @@ struct TonightView: View {
         .quietAppsPicker(for: plan, isPresented: $showQuietPicker)
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
-            await refreshPermissions()
+            await permissions.refresh()
         }
     }
 
@@ -270,14 +268,18 @@ struct TonightView: View {
                     .foregroundStyle(Color.lavendar.opacity(0.75))
             }
 
-            FlowLayout(spacing: 8) {
+            HStack(spacing: 8) {
                 InfoChip(icon: "clock.fill", text: windDownCountdown, tint: Color.starlightGold)
 
-                if let night, isOn, night.alarmEnabled {
+                if let night, isOn, night.alarmEnabled, permissions.alarms == .granted {
                     InfoChip(icon: "alarm.fill", text: "Alarm \(night.wakeMinutes.clockText)", tint: Color.lavendar)
+                } else if let night, isOn, night.alarmEnabled {
+                    InfoChip(icon: "exclamationmark.circle.fill", text: "Alarm needs access", tint: Color.dreamCoral)
                 } else {
                     InfoChip(icon: "alarm", text: "No Alarm", tint: Color.lavendar.opacity(0.6))
                 }
+
+                Spacer(minLength: 0)
             }
         }
         .padding(22)
@@ -390,18 +392,17 @@ struct TonightView: View {
 
     private var quietAppsStatus: RowStatus {
         guard let night = tonightNight, night.isEnabled, night.quietAppsEnabled, !isTonightSkipped else { return .off }
-        guard let plan else { return .needsSetup }
-        return ScreenTimeService.isReady(for: plan) ? .on : .needsSetup
+        return permissions.quietAppsReady(for: plan) ? .on : .needsSetup
     }
 
     private var alarmStatus: RowStatus {
         guard let night = tonightNight, night.isEnabled, night.alarmEnabled, !isTonightSkipped else { return .off }
-        return alarmPermission == .authorized ? .on : .needsSetup
+        return permissions.alarms == .granted ? .on : .needsSetup
     }
 
     private var remindersStatus: RowStatus {
         guard let night = tonightNight, night.isEnabled, night.remindersEnabled, !isTonightSkipped else { return .off }
-        return plan?.notificationsEnabled == true && reminderAccess == .allowed ? .on : .needsSetup
+        return permissions.remindersActive(for: plan) ? .on : .needsSetup
     }
 
     // MARK: Rows
@@ -421,8 +422,16 @@ struct TonightView: View {
     }
 
     private var quietAppsSubtitle: LocalizedStringKey? {
+        if permissions.isPreparingScreenTime {
+            return "Opening Screen Time…"
+        }
         if quietAppsStatus == .needsSetup {
-            return "Tap to choose apps and allow Screen Time"
+            switch permissions.screenTime {
+            case .granted: return "Tap to choose the apps to quiet"
+            case .notDetermined: return "Tap to allow Screen Time and choose apps"
+            case .denied: return "Screen Time access was declined. Tap to try again."
+            case .failed: return "Screen Time isn't available right now. Tap to retry."
+            }
         }
         guard let tonight = tonightNight, tonight.isEnabled, let plan else { return nil }
         let startMinutes = (tonight.bedtimeMinutes - plan.windDownMinutes + 24 * 60) % (24 * 60)
@@ -445,10 +454,12 @@ struct TonightView: View {
 
     private var alarmSubtitle: LocalizedStringKey? {
         if alarmStatus == .needsSetup {
-            if alarmPermission == .notDetermined {
-                return "Tap to allow alarms"
+            switch permissions.alarms {
+            case .notDetermined: return "Tap to allow alarms"
+            case .denied: return "Alarms are off for Snoozly, so it won't ring. Tap to open Settings."
+            case .failed: return "Couldn't confirm alarm access. Tap to retry."
+            case .granted: return nil
             }
-            return "Tap to allow alarms in Settings"
         }
         guard let tonight = tonightNight, tonight.isEnabled, tonight.alarmEnabled else { return nil }
 
@@ -475,10 +486,11 @@ struct TonightView: View {
 
     private var remindersSubtitle: LocalizedStringKey? {
         if remindersStatus == .needsSetup {
-            if reminderAccess == .denied {
-                return "Tap to open Settings and allow notifications"
+            switch permissions.notifications {
+            case .denied: return "Notifications are off for Snoozly. Tap to open Settings."
+            case .granted: return "Tap to turn reminders back on"
+            case .notDetermined, .failed: return "Tap to allow notifications"
             }
-            return "Tap to allow notifications"
         }
         guard let tonight = tonightNight, tonight.isEnabled else { return nil }
         return "\(tonight.bedtimeMinutes.clockText)"
@@ -506,37 +518,21 @@ struct TonightView: View {
 
     // MARK: Actions
 
-    private func refreshPermissions() async {
-        reminderAccess = await NotificationManager.shared.access()
-        alarmPermission = WakeAlarmService.permission
-        screenTimeAllowed = ScreenTimeService.isAuthorized
-    }
-
     private func enableReminders() {
-        guard let plan else { return }
         Task {
-            await NotificationManager.shared.turnOnReminders(for: plan)
-            await refreshPermissions()
+            await permissions.allowNotifications(for: plan)
         }
     }
 
     private func allowAlarms() {
         Task {
-            if alarmPermission == .notDetermined {
-                alarmPermission = await WakeAlarmService.requestPermission()
-                if let plan, alarmPermission == .authorized {
-                    await WakeAlarmService.reschedule(for: plan, force: true)
-                }
-            } else if let url = URL(string: UIApplication.openSettingsURLString) {
-                _ = await UIApplication.shared.open(url)
-            }
+            await permissions.allowAlarms(for: plan)
         }
     }
 
     private func chooseQuietApps() {
         Task {
-            screenTimeAllowed = await ScreenTimeService.prepareForPicker()
-            if screenTimeAllowed {
+            if await permissions.allowScreenTime() {
                 showQuietPicker = true
             }
         }

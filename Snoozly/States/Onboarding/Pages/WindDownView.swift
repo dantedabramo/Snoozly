@@ -15,7 +15,7 @@ struct WindDownView: View {
 
     @State private var appSelection = FamilyActivitySelection()
     @State private var showsPicker = false
-    @State private var screenTimeFailed = false
+    @State private var screenTimeIssue: PermissionStatus?
     @State private var notificationsDenied = false
 
     @State private var appearTick = 0
@@ -180,8 +180,8 @@ struct WindDownView: View {
         switch minutes {
         case 15: "cup.and.saucer.fill"
         case 30: "book.fill"
-        case 45: "leaf.fill"
-        default: "moon.stars.fill"
+        case 45: "moon.stars.fill"
+        default: "moon.zzz.fill"
         }
     }
 
@@ -234,7 +234,7 @@ struct WindDownView: View {
             toggleDetail("A soft nudge at wind-down and at bedtime.")
 
             if notificationsDenied {
-                OnboardingHint(text: "Notifications are off for Snoozly. You can allow them in Settings.")
+                PermissionHint(text: "Notifications are off for Snoozly, so no reminders will arrive. You can allow them in Settings.")
                     .transition(.opacity)
             }
         }
@@ -305,16 +305,20 @@ struct WindDownView: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             }
 
-            if screenTimeFailed {
-                OnboardingHint(text: "Screen Time access wasn't granted. You can try again anytime.")
-                    .transition(.opacity)
+            if let issue = screenTimeIssue {
+                PermissionHint(
+                    text: issue == .failed
+                        ? "Screen Time isn't available right now. You can try again anytime."
+                        : "Screen Time access was declined, so no apps will be quieted. Flip the switch to try again, or allow it in Settings."
+                )
+                .transition(.opacity)
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .nightCard(cornerRadius: 28)
         .animation(.spring(response: 0.5, dampingFraction: 0.82), value: plan.blocksAppsDuringWindDown)
-        .animation(.easeOut(duration: 0.2), value: screenTimeFailed)
+        .animation(.easeOut(duration: 0.2), value: screenTimeIssue)
         .familyActivityPicker(isPresented: $showsPicker, selection: $appSelection)
     }
 
@@ -326,7 +330,7 @@ struct WindDownView: View {
     }
 
     private func setBlocking(_ isOn: Bool) {
-        screenTimeFailed = false
+        screenTimeIssue = nil
         plan.blocksAppsDuringWindDown = isOn
 
         guard isOn else {
@@ -335,27 +339,27 @@ struct WindDownView: View {
         }
 
         Task {
-            let wasAuthorized = ScreenTimeService.isAuthorized
+            let access = await ScreenTimeService.prepareForPicker()
 
-            guard await ScreenTimeService.requestAuthorization() else {
+            guard access == .granted else {
                 plan.blocksAppsDuringWindDown = false
-                screenTimeFailed = true
+                screenTimeIssue = access
                 return
-            }
-
-            if !wasAuthorized {
-                try? await Task.sleep(for: .milliseconds(300))
             }
             showsPicker = true
         }
     }
 
     private func openPicker() {
+        screenTimeIssue = nil
+
         Task {
-            if await ScreenTimeService.requestAuthorization() {
+            let access = await ScreenTimeService.prepareForPicker()
+
+            if access == .granted {
                 showsPicker = true
             } else {
-                screenTimeFailed = true
+                screenTimeIssue = access
             }
         }
     }

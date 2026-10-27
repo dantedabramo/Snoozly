@@ -8,6 +8,12 @@
 import SwiftUI
 import SwiftData
 
+struct MorningPlanItem: Identifiable {
+    var id: Weekday { morning }
+    let morning: Weekday
+    let night: NightPlan
+}
+
 struct WakeUpView: View {
     var plan: SleepPlan
     var isActive: Bool
@@ -20,9 +26,14 @@ struct WakeUpView: View {
 
     private let quickPicks = [6 * 60, 6 * 60 + 30, 7 * 60, 7 * 60 + 30, 8 * 60, 8 * 60 + 30]
 
-    private var nights: [NightPlan] { plan.sortedNights }
+    private var morningItems: [MorningPlanItem] {
+        Weekday.allCases.compactMap { morning in
+            guard let night = plan.night(forMorning: morning) else { return nil }
+            return MorningPlanItem(morning: morning, night: night)
+        }
+    }
 
-    private var anyNightEnabled: Bool { nights.contains { $0.isEnabled } }
+    private var anyNightEnabled: Bool { plan.sortedNights.contains { $0.isEnabled } }
 
     var body: some View {
         OnboardingPageContainer(centersContent: true) {
@@ -35,13 +46,17 @@ struct WakeUpView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     OnboardingHeadline(
                         title: "What time do you wake up?",
-                        subtitle: "Set your wake-up time for each day."
+                        subtitle: "Set your wake-up time for each morning."
                     )
                     .reveal(isActive, delay: 0.05)
 
-                    DayChipRow(nights: nights, selection: $selection) { night in
-                        night.wakeMinutes.compactClockText
-                    }
+                    DayChipRow(
+                        items: morningItems,
+                        selection: $selection,
+                        day: \.morning,
+                        isEnabled: { $0.night.isEnabled },
+                        subtitle: { $0.night.wakeMinutes.compactClockText }
+                    )
                     .reveal(isActive, delay: 0.15)
 
                     if !isWide {
@@ -64,9 +79,14 @@ struct WakeUpView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
 
                 VStack(alignment: .leading, spacing: 16) {
-                    if let night = nights.first(where: { $0.weekday == selection }) {
-                        MorningEditor(night: night, quickPicks: quickPicks, alarm: alarmBinding(for: night)) {
-                            applyToEveryMorning(from: night)
+                    if let item = morningItems.first(where: { $0.morning == selection }) {
+                        MorningEditor(
+                            night: item.night,
+                            morning: item.morning,
+                            quickPicks: quickPicks,
+                            alarm: alarmBinding(for: item.night)
+                        ) {
+                            applyToEveryMorning(from: item.morning, wakeMinutes: item.night.wakeMinutes)
                         }
                         .reveal(isActive, delay: 0.25, offset: 26)
                         .frame(maxWidth: 560, alignment: .topLeading)
@@ -130,11 +150,13 @@ struct WakeUpView: View {
         }
     }
 
-    private func applyToEveryMorning(from source: NightPlan) {
+    private func applyToEveryMorning(from sourceMorning: Weekday, wakeMinutes: Int) {
         withAnimation(.snappy) {
-            for night in nights
-            where night.isEnabled && night.weekday.isLateNight == source.weekday.isLateNight {
-                night.wakeMinutes = source.wakeMinutes
+            for item in morningItems {
+                guard item.night.isEnabled else { continue }
+                if item.morning.isWeekendMorning == sourceMorning.isWeekendMorning {
+                    item.night.wakeMinutes = wakeMinutes
+                }
             }
         }
     }
@@ -142,6 +164,7 @@ struct WakeUpView: View {
 
 private struct MorningEditor: View {
     @Bindable var night: NightPlan
+    let morning: Weekday
     let quickPicks: [Int]
     let alarm: Binding<Bool>
     let onApplyToAll: () -> Void
@@ -153,8 +176,8 @@ private struct MorningEditor: View {
 
     var body: some View {
         NightTimeCard(
-            title: "\(night.weekday.fullName)",
-            subtitle: "Wake-up time",
+            title: "\(morning.fullName) Morning",
+            subtitle: "After \(night.weekday.fullName) night",
             caption: "Wake-up",
             symbol: "sunrise.fill",
             accent: Color.starlightGold,
@@ -162,12 +185,13 @@ private struct MorningEditor: View {
             isEnabled: $night.isEnabled,
             minutes: $night.wakeMinutes,
             quickPicks: quickPicks,
-            disabledMessage: "No wake-up plan this morning.",
-            applyToAllTitle: night.weekday.isLateNight
-                ? "Use this time on weekend mornings"
-                : "Use this time on weekday mornings",
+            disabledMessage: "No sleep scheduled for \(night.weekday.fullName) night.",
+            applyToAllTitle: morning.isWeekendMorning
+                ? "Use this time on weekend mornings (Sat–Sun)"
+                : "Use this time on weekday mornings (Mon–Fri)",
             onApplyToAll: onApplyToAll,
-            alarm: alarm
+            alarm: alarm,
+            showsEnabledToggle: false
         )
     }
 }
@@ -178,7 +202,5 @@ private struct MorningEditor: View {
     ZStack {
         NightBackground()
         WakeUpView(plan: preview.plan, isActive: true)
-            .padding()
     }
-    .modelContainer(preview.container)
 }

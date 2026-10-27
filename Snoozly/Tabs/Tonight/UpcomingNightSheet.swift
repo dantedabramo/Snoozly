@@ -19,6 +19,7 @@ struct UpcomingNightSheet: View {
     let onEdit: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var permissions = PermissionCenter.shared
     @ScaledMetric(relativeTo: .largeTitle) private var heroTimeSize: CGFloat = 48
 
     private var isOn: Bool {
@@ -206,7 +207,7 @@ struct UpcomingNightSheet: View {
             RowDivider()
 
             SettingsRow(icon: "alarm.fill", title: "Wake-up Alarm", subtitle: alarmSubtitle(for: night), tint: Color.starlightGold) {
-                StatusCapsule(kind: night.alarmEnabled ? .on : .off)
+                StatusCapsule(kind: capsuleKind(isOn: night.alarmEnabled, isWorking: permissions.alarms == .granted))
             }
 
             RowDivider()
@@ -217,7 +218,7 @@ struct UpcomingNightSheet: View {
                 subtitle: quietAppsSubtitle(for: night),
                 tint: Color.moonlightBlue
             ) {
-                StatusCapsule(kind: night.quietAppsEnabled ? .on : .off)
+                StatusCapsule(kind: capsuleKind(isOn: night.quietAppsEnabled, isWorking: permissions.quietAppsReady(for: plan)))
             }
 
             RowDivider()
@@ -228,7 +229,7 @@ struct UpcomingNightSheet: View {
                 subtitle: remindersSubtitle(for: night),
                 tint: Color.dreamCoral
             ) {
-                StatusCapsule(kind: night.remindersEnabled ? .on : .off)
+                StatusCapsule(kind: capsuleKind(isOn: night.remindersEnabled, isWorking: permissions.remindersActive(for: plan)))
             }
         }
         .padding(16)
@@ -239,18 +240,26 @@ struct UpcomingNightSheet: View {
         (night.bedtimeMinutes - windDownMinutes + 24 * 60) % (24 * 60)
     }
 
+    private func capsuleKind(isOn: Bool, isWorking: Bool) -> StatusCapsule.Kind {
+        guard isOn else { return .off }
+        return isWorking ? .on : .setUp
+    }
+
     private func quietAppsSubtitle(for night: NightPlan) -> LocalizedStringKey? {
         guard night.quietAppsEnabled else { return nil }
+        guard permissions.quietAppsReady(for: plan) else { return "Paused until Screen Time and apps are set up" }
         return "\(windDownStart(for: night).clockText) until wake-up"
     }
 
     private func remindersSubtitle(for night: NightPlan) -> LocalizedStringKey? {
         guard night.remindersEnabled else { return nil }
+        guard permissions.remindersActive(for: plan) else { return "Paused until notifications are allowed" }
         return "At wind-down and at bedtime"
     }
 
     private func alarmSubtitle(for night: NightPlan) -> LocalizedStringKey? {
         guard night.alarmEnabled else { return nil }
+        guard permissions.alarms == .granted else { return "Paused until alarms are allowed" }
 
         let wake = night.wakeMinutes.clockText
         let snooze = plan?.effectiveSnoozeMinutes(for: night) ?? 0

@@ -46,14 +46,12 @@ struct ProSheetView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .topTrailing) {
             NightBackground(mood: .calm)
 
             VStack(spacing: 0) {
-                topBar
-
                 ScrollView {
-                    VStack(spacing: 18) {
+                    VStack(spacing: 14) {
                         hero
 
                         if proManager.isPro {
@@ -64,8 +62,8 @@ struct ProSheetView: View {
                         }
                     }
                     .padding(.horizontal, 20)
-                    .padding(.top, 4)
-                    .padding(.bottom, 24)
+                    .padding(.top, 6)
+                    .padding(.bottom, 12)
                 }
                 .scrollIndicators(.hidden)
 
@@ -73,6 +71,8 @@ struct ProSheetView: View {
                     footer
                 }
             }
+
+            closeButton
         }
         .task {
             if proManager.products.isEmpty {
@@ -86,49 +86,45 @@ struct ProSheetView: View {
         .interactiveDismissDisabled(isPurchasing)
     }
 
-    // MARK: - Top Bar
+    // MARK: - Close
 
-    private var topBar: some View {
-        HStack {
-            Spacer()
-
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.lavendar)
-                    .frame(width: 40, height: 40)
-                    .nightCard(cornerRadius: 20, blurs: false)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(PressScaleButtonStyle())
-            .accessibilityLabel("Close")
+    private var closeButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Color.lavendar)
+                .frame(width: 36, height: 36)
+                .nightCard(cornerRadius: 18, blurs: false)
+                .contentShape(Circle())
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 4)
+        .buttonStyle(PressScaleButtonStyle())
+        .accessibilityLabel("Close")
+        .padding(.top, 14)
+        .padding(.trailing, 16)
     }
 
     // MARK: - Hero
 
     private var hero: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 6) {
             ZStack {
-                GlowOrb(color: Color.dreamPurple, opacity: 0.55, diameter: 180)
+                GlowOrb(color: Color.dreamPurple, opacity: 0.55, diameter: 130)
 
                 SleepyCreatureView(showStars: true)
-                    .frame(width: 104, height: 104)
+                    .frame(width: 80, height: 80)
             }
-            .frame(height: 150)
-            .padding(.top, 14)
+            .frame(height: 100)
+            .padding(.top, 10)
 
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 HStack(spacing: 8) {
                     Text(proManager.isPro ? "You're on Snoozly" : "Sleep better with Snoozly")
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
 
                     proBadge
                 }
@@ -136,10 +132,11 @@ struct ProSheetView: View {
                 Text(proManager.isPro
                      ? "Thanks for supporting Snoozly. Every Pro feature is unlocked."
                      : "Look further ahead, spot what shapes your nights, and keep every check-in.")
-                    .font(.system(.subheadline, design: .rounded))
+                    .font(.system(.footnote, design: .rounded))
                     .foregroundStyle(Color.lavendar.opacity(0.85))
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 12)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 8)
             }
         }
     }
@@ -156,7 +153,7 @@ struct ProSheetView: View {
     // MARK: - Features
 
     private var featuresCard: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             featureRow(
                 icon: "chart.line.uptrend.xyaxis",
                 title: "14-day and 1-month trends",
@@ -178,25 +175,25 @@ struct ProSheetView: View {
                 subtitle: "Find out which habits raise or lower your score."
             )
         }
-        .padding(18)
-        .nightCard(cornerRadius: 26)
+        .padding(14)
+        .nightCard(cornerRadius: 24)
     }
 
     private func featureRow(icon: String, title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .center, spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Color.starlightGold)
-                .frame(width: 38, height: 38)
+                .frame(width: 32, height: 32)
                 .background(Circle().fill(Color.midnightNavy.opacity(0.65)))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.system(.subheadline, design: .rounded, weight: .bold))
                     .foregroundStyle(.white)
 
                 Text(subtitle)
-                    .font(.system(.footnote, design: .rounded))
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(Color.lavendar.opacity(0.8))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -218,11 +215,11 @@ struct ProSheetView: View {
                     .font(.system(.footnote, design: .rounded))
                     .foregroundStyle(Color.lavendar.opacity(0.75))
             }
-            .frame(maxWidth: .infinity, minHeight: 150)
+            .frame(maxWidth: .infinity, minHeight: 120)
         } else if proManager.products.isEmpty {
             unavailableCard
         } else {
-            VStack(spacing: 12) {
+            VStack(spacing: 10) {
                 if let yearly = proManager.yearlyProduct {
                     planCard(
                         plan: .yearly,
@@ -292,7 +289,7 @@ struct ProSheetView: View {
             }
             .buttonStyle(PressScaleButtonStyle())
         }
-        .padding(18)
+        .padding(16)
         .frame(maxWidth: .infinity)
         .nightCard(cornerRadius: 24)
     }
@@ -320,9 +317,9 @@ struct ProSheetView: View {
                 selectedPlan = plan
             }
         } label: {
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.system(size: 21, weight: .semibold))
                     .foregroundStyle(isSelected ? Color.starlightGold : Color.lavendar.opacity(0.45))
                     .contentTransition(.symbolEffect(.replace))
 
@@ -353,8 +350,11 @@ struct ProSheetView: View {
                 Text(price)
                     .font(.system(.title3, design: .rounded, weight: .heavy))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
-            .padding(16)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .background {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(isSelected ? Color.dreamPurple.opacity(0.28) : Color.white.opacity(0.06))
@@ -438,12 +438,13 @@ struct ProSheetView: View {
     // MARK: - Footer
 
     private var footer: some View {
-        VStack(spacing: 10) {
-            if let message = notice ?? proManager.errorMessage {
-                Text(message)
+        VStack(spacing: 8) {
+            if let notice {
+                Text(notice)
                     .font(.system(.footnote, design: .rounded, weight: .medium))
                     .foregroundStyle(Color.starlightGold)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .transition(.opacity)
             }
 
@@ -462,43 +463,11 @@ struct ProSheetView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Button {
-                Task {
-                    notice = nil
-                    await proManager.restorePurchases()
-                    if proManager.isPro {
-                        dismiss()
-                    }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    if proManager.isRestoring {
-                        SwiftUI.ProgressView()
-                            .controlSize(.mini)
-                            .tint(Color.lavendar)
-                    }
-
-                    Text("Restore Purchases")
-                        .font(.system(.footnote, design: .rounded, weight: .semibold))
-                        .foregroundStyle(Color.lavendar.opacity(0.9))
-                }
-                .frame(minHeight: 32)
-            }
-            .disabled(isPurchasing || proManager.isRestoring)
-
-            HStack(spacing: 18) {
-                Link("Terms of Use", destination: ProManager.termsURL)
-
-                if let privacyURL = ProManager.privacyURL {
-                    Link("Privacy Policy", destination: privacyURL)
-                }
-            }
-            .font(.system(.caption2, design: .rounded, weight: .semibold))
-            .foregroundStyle(Color.lavendar.opacity(0.7))
+            linksRow
         }
         .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
         .background {
             LinearGradient(
                 colors: [Color.midnightNavy.opacity(0), Color.midnightNavy.opacity(0.85)],
@@ -509,7 +478,63 @@ struct ProSheetView: View {
             .allowsHitTesting(false)
         }
         .animation(.snappy, value: notice)
-        .animation(.snappy, value: proManager.errorMessage)
+    }
+
+    private var linksRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                restoreButton
+                linkDot
+                LegalLink(title: "Terms of Use", url: ProManager.termsURL)
+                linkDot
+                LegalLink(title: "Privacy Policy", url: ProManager.privacyURL)
+            }
+
+            VStack(spacing: 2) {
+                restoreButton
+
+                HStack(spacing: 12) {
+                    LegalLink(title: "Terms of Use", url: ProManager.termsURL)
+                    linkDot
+                    LegalLink(title: "Privacy Policy", url: ProManager.privacyURL)
+                }
+            }
+        }
+        .font(.system(.caption, design: .rounded, weight: .semibold))
+        .foregroundStyle(Color.lavendar.opacity(0.8))
+        .frame(minHeight: 36)
+    }
+
+    private var linkDot: some View {
+        Circle()
+            .fill(Color.lavendar.opacity(0.35))
+            .frame(width: 3, height: 3)
+            .accessibilityHidden(true)
+    }
+
+    private var restoreButton: some View {
+        Button {
+            Task {
+                notice = nil
+                notice = await proManager.restorePurchases()
+                if proManager.isPro {
+                    dismiss()
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                if proManager.isRestoring {
+                    SwiftUI.ProgressView()
+                        .controlSize(.mini)
+                        .tint(Color.lavendar)
+                }
+
+                Text("Restore Purchases")
+            }
+            .frame(minHeight: 32)
+        }
+        .buttonStyle(.plain)
+        .disabled(isPurchasing || proManager.isRestoring)
     }
 
     private var ctaTitle: LocalizedStringKey {
@@ -539,7 +564,6 @@ struct ProSheetView: View {
         Task {
             isPurchasing = true
             notice = nil
-            proManager.errorMessage = nil
 
             do {
                 let result = try await purchase(product)
@@ -551,11 +575,15 @@ struct ProSheetView: View {
                     return
                 case .pending:
                     notice = "Your purchase is waiting for approval. Snoozly Pro unlocks as soon as it's approved."
-                case .cancelled, .failed:
+                case .unverified:
+                    notice = "We couldn't verify that purchase. Please try again or restore purchases."
+                case .failed:
+                    notice = "That purchase didn't go through. Please try again."
+                case .cancelled:
                     break
                 }
             } catch {
-                proManager.errorMessage = error.localizedDescription
+                notice = ProManager.purchaseMessage(for: error)
             }
 
             isPurchasing = false

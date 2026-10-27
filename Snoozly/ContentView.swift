@@ -29,6 +29,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppStorageKey.skipDateString) private var skipDateString = ""
     @State private var proManager = ProManager.shared
+    @State private var permissions = PermissionCenter.shared
     @State private var router = QuickActionRouter.shared
     @State private var selectedTab: Int = 0
     @State private var scheduleWeekday: Weekday = .today
@@ -96,6 +97,10 @@ struct ContentView: View {
         .task(id: skipDateString) {
             router.refreshShortcutItems(isSkipped: isTonightSkipped)
         }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            await permissions.refresh()
+        }
         .task(id: reminderKey) {
             guard scenePhase == .active, let plan = plans.first else { return }
             await NotificationManager.shared.reschedule(for: plan)
@@ -108,6 +113,14 @@ struct ContentView: View {
             guard let plan = plans.first else { return }
             plan.normalizeSnooze()
             await WakeAlarmService.reschedule(for: plan)
+        }
+        .task(id: permissions.alarms) {
+            guard permissions.alarms == .granted, let plan = plans.first else { return }
+            await WakeAlarmService.reschedule(for: plan)
+        }
+        .task(id: permissions.screenTime) {
+            guard permissions.screenTime == .granted, let plan = plans.first else { return }
+            ScreenTimeService.reschedule(for: plan)
         }
     }
 

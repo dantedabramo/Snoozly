@@ -16,8 +16,6 @@ struct SleepyCreatureView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let canvas: CGFloat = 880
-    private let feet  = UnitPoint(x: (480 - 80) / 880.0, y: (837 - 80) / 880.0)
-    private let brim  = UnitPoint(x: (480 - 80) / 880.0, y: (560 - 80) / 880.0)
     private let tail  = UnitPoint(x: (845 - 80) / 880.0, y: (440 - 80) / 880.0)
 
     private var breath: Animation {
@@ -26,8 +24,6 @@ struct SleepyCreatureView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let k = min(geo.size.width, geo.size.height) / canvas
-
             ZStack {
                 if showStars {
                     layer("CreatureStars")
@@ -35,22 +31,21 @@ struct SleepyCreatureView: View {
                         .animation(.easeInOut(duration: 1.7).repeatForever(autoreverses: true), value: twinkle)
                 }
 
-                layer("CreatureBody")
-                    .scaleEffect(x: inhaled ? 1.02 : 1.0,
-                                 y: inhaled ? 1.055 : 1.0,
-                                 anchor: feet)
-
                 ZStack {
-                    layer("CreatureHat")
-                    layer("CreaturePompom")
-                        .rotationEffect(.degrees(inhaled ? -3 : 3), anchor: tail)
-                        .animation(breath.delay(0.25), value: inhaled)
-                }
-                .rotationEffect(.degrees(inhaled ? 0.5 : 0), anchor: brim)
-                .offset(y: inhaled ? -15 * k : 0)
+                    layer("CreatureBody")
 
-                layer("CreatureFace")
-                    .offset(y: inhaled ? -8 * k : 0)
+                    ZStack {
+                        layer("CreatureHat")
+                        layer("CreaturePompom")
+                            .rotationEffect(.degrees(inhaled ? -3 : 3), anchor: tail)
+                            .animation(breath.delay(0.25), value: inhaled)
+                    }
+
+                    layer("CreatureFace")
+                }
+                .scaleEffect(x: inhaled ? 1.03 : 0.98,
+                             y: inhaled ? 1.025 : 0.98,
+                             anchor: .center)
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .animation(breath, value: inhaled)

@@ -25,9 +25,8 @@ struct SettingsView: View {
     @State private var showManageSubscriptions = false
     @State private var showOfferCodeRedemption = false
     @State private var showRefundRequest = false
-    @State private var reminderAccess: NotificationManager.Access = .notDetermined
-    @State private var alarmPermission = WakeAlarmService.permission
-    @State private var screenTimeAllowed = ScreenTimeService.isAuthorized
+    @State private var permissions = PermissionCenter.shared
+    @State private var subscriptionMessage: String?
     @State private var appeared = false
 
     private var plan: SleepPlan? {
@@ -92,8 +91,11 @@ struct SettingsView: View {
         .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
         .offerCodeRedemption(isPresented: $showOfferCodeRedemption) { result in
             Task {
-                if case .failure = result {
-                    proManager.errorMessage = "That code couldn't be redeemed. Check it and try again."
+                switch result {
+                case .success:
+                    subscriptionMessage = nil
+                case .failure(let error):
+                    subscriptionMessage = ProManager.redeemMessage(for: error)
                 }
                 await proManager.refresh()
             }
@@ -102,7 +104,22 @@ struct SettingsView: View {
         .quietAppsPicker(for: plan, isPresented: $showQuietPicker)
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
-            await refreshPermissions()
+            await permissions.refresh()
+        }
+        .task(id: subscriptionMessage) {
+            guard subscriptionMessage != nil else { return }
+            do {
+                try await Task.sleep(for: .seconds(6))
+            } catch {
+                return
+            }
+            subscriptionMessage = nil
+        }
+        .onChange(of: proManager.isPro) { _, isPro in
+            if isPro { subscriptionMessage = nil }
+        }
+        .onDisappear {
+            subscriptionMessage = nil
         }
     }
 
@@ -169,6 +186,7 @@ struct SettingsView: View {
         let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
 
         return Button {
+            subscriptionMessage = nil
             showProSheet = true
         } label: {
             HStack(spacing: 14) {
@@ -264,7 +282,7 @@ struct SettingsView: View {
     // MARK: - Bedtime Routine
 
     private var remindersAreOn: Bool {
-        plan?.notificationsEnabled == true && reminderAccess == .allowed
+        permissions.remindersActive(for: plan)
     }
 
     private var reminderBinding: Binding<Bool> {
@@ -274,8 +292,7 @@ struct SettingsView: View {
                 guard let plan else { return }
                 if newValue {
                     Task {
-                        await NotificationManager.shared.turnOnReminders(for: plan)
-                        await refreshPermissions()
+                        await permissions.allowNotifications(for: plan)
                     }
                 } else {
                     plan.notificationsEnabled = false
@@ -285,17 +302,31 @@ struct SettingsView: View {
     }
 
     private var reminderSubtitle: LocalizedStringKey {
-        if reminderAccess == .denied {
-            return "Notifications are off for Snoozly. Turn on to open Settings."
+        switch permissions.notifications {
+        case .denied:
+            return "Notifications are off for Snoozly, so nothing will arrive. Turn on to open Settings."
+        case .granted:
+            return remindersAreOn ? "A soft nudge at wind-down and at bedtime." : "Off. Turn on for a nudge at wind-down and at bedtime."
+        case .notDetermined, .failed:
+            return "Turn on to allow notifications."
         }
-        return "A soft nudge at wind-down and at bedtime."
     }
 
     private var quietAppsSubtitle: LocalizedStringKey {
         guard let plan else { return "Choose apps to quiet" }
-        let count = ScreenTimeService.selectionCount(for: plan)
-        if !screenTimeAllowed { return "Needs Screen Time access" }
-        return count == 0 ? "Choose apps to quiet" : "\(count) selected, quiet from wind-down until you wake"
+        if permissions.isPreparingScreenTime { return "Opening Screen Time…" }
+
+        switch permissions.screenTime {
+        case .granted:
+            let count = ScreenTimeService.selectionCount(for: plan)
+            return count == 0 ? "Choose apps to quiet" : "\(count) selected, quiet from wind-down until you wake"
+        case .notDetermined:
+            return "Tap to allow Screen Time and choose apps"
+        case .denied:
+            return "Screen Time access was declined. Tap to try again."
+        case .failed:
+            return "Screen Time isn't available right now. Tap to retry."
+        }
     }
 
     private var bedtimeRoutineSection: some View {
@@ -313,9 +344,7 @@ struct SettingsView: View {
             } label: {
                 SettingsRow(icon: "hourglass", title: "Quiet Apps", subtitle: quietAppsSubtitle, tint: Color.moonlightBlue) {
                     HStack(spacing: 8) {
-                        if let plan {
-                            StatusCapsule(kind: ScreenTimeService.isReady(for: plan) ? .on : .setUp)
-                        }
+                        StatusCapsule(kind: permissions.quietAppsReady(for: plan) ? .on : .setUp)
                         RowChevron()
                     }
                 }
@@ -351,6 +380,7 @@ struct SettingsView: View {
             }
 
             Button {
+                subscriptionMessage = nil
                 showOfferCodeRedemption = true
             } label: {
                 SettingsRow(icon: "gift.fill", title: "Redeem Offer Code", tint: Color.dreamCoral) { RowChevron() }
@@ -361,7 +391,8 @@ struct SettingsView: View {
 
             Button {
                 Task {
-                    await proManager.restorePurchases()
+                    subscriptionMessage = nil
+                    subscriptionMessage = await proManager.restorePurchases()
                 }
             } label: {
                 SettingsRow(icon: "arrow.clockwise", title: "Restore Purchases", tint: Color.moonlightBlue) {
@@ -375,11 +406,12 @@ struct SettingsView: View {
             .buttonStyle(PressScaleButtonStyle())
             .disabled(proManager.isRestoring)
 
-            if let message = proManager.errorMessage {
+            if let message = subscriptionMessage {
                 Text(message)
                     .font(.system(.footnote, design: .rounded, weight: .medium))
                     .foregroundStyle(Color.starlightGold)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .transition(.opacity)
             }
         }
     }
@@ -387,27 +419,46 @@ struct SettingsView: View {
     // MARK: - Access
 
     private var accessSection: some View {
-        SettingsSection("ACCESS") {
-            SettingsRow(icon: "bell.fill", title: "Notifications", tint: Color.dreamCoral) {
-                AccessPill(isAllowed: reminderAccess == .allowed) {
-                    requestNotificationAccess()
-                }
+        SettingsSection("ACCESS", footer: "Each permission stands on its own. A feature stays paused until the access it needs is allowed.") {
+            PermissionRow(
+                icon: "bell.fill",
+                title: "Notifications",
+                tint: Color.dreamCoral,
+                kind: .notifications,
+                status: permissions.notifications
+            ) {
+                requestNotificationAccess()
+            } openSettings: {
+                permissions.openNotificationSettings()
             }
 
             RowDivider()
 
-            SettingsRow(icon: "alarm.fill", title: "Alarms", tint: Color.starlightGold) {
-                AccessPill(isAllowed: alarmPermission == .authorized) {
-                    requestAlarmAccess()
-                }
+            PermissionRow(
+                icon: "alarm.fill",
+                title: "Alarms",
+                tint: Color.starlightGold,
+                kind: .alarms,
+                status: permissions.alarms
+            ) {
+                requestAlarmAccess()
+            } openSettings: {
+                permissions.openSettings()
             }
 
             RowDivider()
 
-            SettingsRow(icon: "hourglass", title: "Screen Time", tint: Color.moonlightBlue) {
-                AccessPill(isAllowed: screenTimeAllowed) {
-                    requestScreenTimeAccess()
-                }
+            PermissionRow(
+                icon: "hourglass",
+                title: "Screen Time",
+                tint: Color.moonlightBlue,
+                kind: .screenTime,
+                status: permissions.screenTime,
+                isBusy: permissions.isPreparingScreenTime
+            ) {
+                requestScreenTimeAccess()
+            } openSettings: {
+                permissions.openSettings()
             }
         }
     }
@@ -426,6 +477,10 @@ struct SettingsView: View {
 
             RowDivider()
 
+            privacyPolicyRow
+
+            RowDivider()
+
             SettingsRow(icon: "info.circle.fill", title: "Version", tint: Color.lavendar) {
                 Text(versionText)
                     .font(.system(.subheadline, design: .rounded))
@@ -434,53 +489,55 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Actions
+    // MARK: - Privacy Policy
 
-    private func refreshPermissions() async {
-        reminderAccess = await NotificationManager.shared.access()
-        alarmPermission = WakeAlarmService.permission
-        screenTimeAllowed = ScreenTimeService.isAuthorized
+    @ViewBuilder
+    private var privacyPolicyRow: some View {
+        if let url = ProManager.privacyURL {
+            Link(destination: url) {
+                privacyPolicyLabel
+            }
+        } else {
+            Button {} label: {
+                privacyPolicyLabel
+            }
+            .buttonStyle(.plain)
+        }
     }
+
+    private var privacyPolicyLabel: some View {
+        SettingsRow(icon: "hand.raised.fill", title: "Privacy Policy", tint: Color.moonlightBlue) {
+            Image(systemName: "arrow.up.forward")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.lavendar.opacity(0.5))
+        }
+    }
+
+    // MARK: - Actions
 
     private func chooseQuietApps() {
         Task {
-            screenTimeAllowed = await ScreenTimeService.prepareForPicker()
-            if screenTimeAllowed {
+            if await permissions.allowScreenTime() {
                 showQuietPicker = true
             }
         }
     }
 
     private func requestNotificationAccess() {
-        guard let plan else { return }
         Task {
-            await NotificationManager.shared.turnOnReminders(for: plan)
-            await refreshPermissions()
+            await permissions.allowNotifications(for: plan)
         }
     }
 
     private func requestAlarmAccess() {
         Task {
-            if alarmPermission == .notDetermined {
-                alarmPermission = await WakeAlarmService.requestPermission()
-                if let plan, alarmPermission == .authorized {
-                    await WakeAlarmService.reschedule(for: plan, force: true)
-                }
-            } else {
-                openSystemSettings()
-            }
+            await permissions.allowAlarms(for: plan)
         }
     }
 
     private func requestScreenTimeAccess() {
         Task {
-            screenTimeAllowed = await ScreenTimeService.requestAuthorization()
-        }
-    }
-
-    private func openSystemSettings() {
-        if let url = URL(string: UIApplication.openSettingsURLString) {
-            UIApplication.shared.open(url)
+            await permissions.allowScreenTime()
         }
     }
 }

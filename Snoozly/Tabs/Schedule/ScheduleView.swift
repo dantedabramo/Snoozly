@@ -16,7 +16,7 @@ struct ScheduleView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppStorageKey.sleepGoalMinutes) private var sleepGoalMinutes = 480
 
-    @State private var reminderAccess: NotificationManager.Access = .notDetermined
+    @State private var permissions = PermissionCenter.shared
     @State private var showQuietPicker = false
     @State private var appeared = false
     @ScaledMetric(relativeTo: .largeTitle) private var timeSize: CGFloat = 40
@@ -69,7 +69,7 @@ struct ScheduleView: View {
         .quietAppsPicker(for: plan, isPresented: $showQuietPicker)
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
-            reminderAccess = await NotificationManager.shared.access()
+            await permissions.refresh()
         }
     }
 
@@ -110,7 +110,7 @@ struct ScheduleView: View {
                         .background(Color.midnightNavy)
                 }
 
-            Label("Select a day to edit it. Press and hold to copy across days.", systemImage: "hand.tap.fill")
+            Label("Pick the night you go to bed. You wake up the next morning. Press and hold to copy across days.", systemImage: "hand.tap.fill")
                 .font(.system(.footnote, design: .rounded))
                 .foregroundStyle(Color.lavendar.opacity(0.7))
                 .padding(.horizontal, 4)
@@ -163,15 +163,25 @@ struct ScheduleView: View {
         .padding(.vertical, 4)
     }
 
-    private func cardHeader(icon: String, title: String, isActive: Bool, tint: Color) -> some View {
+    private func cardHeader(icon: String, title: String, subtitle: String? = nil, isActive: Bool, tint: Color) -> some View {
         HStack(spacing: 12) {
             RowIcon(systemName: icon, size: 40, tint: isActive ? tint : Color.white.opacity(0.4))
 
-            Text(title)
-                .font(.system(.title3, design: .rounded, weight: .bold))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(.title3, design: .rounded, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(.footnote, design: .rounded, weight: .medium))
+                        .foregroundStyle(Color.lavendar.opacity(0.7))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
 
             Spacer(minLength: 8)
         }
@@ -223,7 +233,13 @@ struct ScheduleView: View {
         let morningDay = night.weekday.shifted(by: 1)
 
         return VStack(alignment: .leading, spacing: 16) {
-            cardHeader(icon: "sunrise.fill", title: "\(night.weekday.fullName) Wake-up", isActive: night.isEnabled, tint: Color.starlightGold)
+            cardHeader(
+                icon: "sunrise.fill",
+                title: "\(morningDay.fullName) Morning",
+                subtitle: "After \(night.weekday.fullName) night",
+                isActive: night.isEnabled,
+                tint: Color.starlightGold
+            )
 
             if night.isEnabled {
                 VStack(spacing: 12) {
@@ -233,11 +249,22 @@ struct ScheduleView: View {
 
                     VStack(spacing: 10) {
                         optionRow(icon: "alarm.fill", title: "Wake-up Alarm", tint: Color.starlightGold) {
-                            Toggle(isOn: Bindable(night).alarmEnabled) {
+                            Toggle(isOn: alarmBinding(for: night)) {
                                 Text("Wake-up Alarm")
                             }
                             .labelsHidden()
                             .tint(Color.dreamPurple)
+                        }
+
+                        if night.alarmEnabled && permissions.alarms != .granted {
+                            AccessNotice(
+                                message: alarmNoticeMessage,
+                                actionTitle: PermissionKind.alarms.actionTitle(for: permissions.alarms)
+                            ) {
+                                Task {
+                                    await permissions.allowAlarms(for: plan)
+                                }
+                            }
                         }
 
                         if night.alarmEnabled {
@@ -248,7 +275,7 @@ struct ScheduleView: View {
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
             } else {
-                Text("No wake-up alarm or schedule for this morning.")
+                Text("No wake-up set for \(morningDay.fullName) morning.")
                     .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(Color.lavendar.opacity(0.65))
                     .padding(.vertical, 4)
@@ -258,36 +285,91 @@ struct ScheduleView: View {
         .nightCard(cornerRadius: 28)
         .animation(.spring(response: 0.45, dampingFraction: 0.8), value: night.isEnabled)
         .animation(.spring(response: 0.45, dampingFraction: 0.8), value: night.alarmEnabled)
+        .animation(.spring(response: 0.45, dampingFraction: 0.8), value: permissions.alarms)
+    }
+
+    private var alarmNoticeMessage: LocalizedStringKey {
+        switch permissions.alarms {
+        case .denied: "Alarms are off for Snoozly, so this alarm won't ring."
+        case .failed: "Couldn't confirm alarm access, so this alarm may not ring."
+        case .notDetermined: "Allow alarms so this one can ring."
+        case .granted: ""
+        }
+    }
+
+    private func alarmBinding(for night: NightPlan) -> Binding<Bool> {
+        Binding(
+            get: { night.alarmEnabled },
+            set: { newValue in
+                night.alarmEnabled = newValue
+                if newValue, permissions.alarms == .notDetermined || permissions.alarms == .failed {
+                    Task {
+                        await permissions.allowAlarms(for: plan)
+                    }
+                }
+            }
+        )
     }
 
     private func sleepSummary(for night: NightPlan) -> some View {
-        let meetsGoal = night.sleepMinutes >= sleepGoalMinutes - 15
-        let tint = meetsGoal ? Color.restfulMint : Color.dreamCoral
-        let text = meetsGoal
-            ? "\(night.sleepMinutes.durationText) of sleep · meets your goal"
-            : "\(night.sleepMinutes.durationText) of sleep · under your \(sleepGoalMinutes.durationText) goal"
+        let sleep = night.sleepMinutes
+        let difference = sleep - sleepGoalMinutes
+        let goalText = sleepGoalMinutes.durationText
 
-        return HStack(spacing: 8) {
-            Image(systemName: meetsGoal ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 13, weight: .bold))
+        let icon: String
+        let tint: Color
+        let detail: LocalizedStringKey
 
-            Text(text)
-                .font(.system(.footnote, design: .rounded, weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
+        if difference < -15 {
+            icon = "exclamationmark.triangle.fill"
+            tint = Color.dreamCoral
+            detail = "\((-difference).durationText) short of your \(goalText) goal"
+        } else if difference > 120 {
+            icon = "moon.zzz.fill"
+            tint = Color.lavendar
+            detail = "\(difference.durationText) over your \(goalText) goal"
+        } else if difference > 15 {
+            icon = "checkmark.seal.fill"
+            tint = Color.restfulMint
+            detail = "Meets your \(goalText) goal with \(difference.durationText) to spare"
+        } else {
+            icon = "checkmark.seal.fill"
+            tint = Color.restfulMint
+            detail = "Right on your \(goalText) goal"
+        }
+
+        return HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(tint)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(tint.opacity(0.16)))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("\(sleep.durationText) of sleep")
+                    .font(.system(.callout, design: .rounded, weight: .bold))
+                    .foregroundStyle(.white)
+
+                Text(detail)
+                    .font(.system(.footnote, design: .rounded, weight: .medium))
+                    .foregroundStyle(tint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Spacer(minLength: 0)
         }
-        .foregroundStyle(tint)
         .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.vertical, 10)
         .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(tint.opacity(0.12))
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(tint.opacity(0.10))
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(tint.opacity(0.22), lineWidth: 1)
         }
+        .accessibilityElement(children: .combine)
     }
 
     private func snoozeRow(for night: NightPlan) -> some View {
@@ -331,21 +413,50 @@ struct ScheduleView: View {
 
     private var quietAppsSubtitle: LocalizedStringKey {
         guard let plan else { return "Choose apps to quiet" }
-        if ScreenTimeService.isReady(for: plan) {
-            return "\(ScreenTimeService.selectionCount(for: plan)) selected · tap to change"
+        if permissions.isPreparingScreenTime { return "Opening Screen Time…" }
+
+        let count = ScreenTimeService.selectionCount(for: plan)
+
+        guard permissions.screenTime == .granted else {
+            return count == 0 ? "Needs Screen Time access" : "\(count) selected · needs Screen Time access"
         }
-        return "Tap to choose apps"
+        return count == 0 ? "Tap to choose apps" : "\(count) selected · tap to change"
     }
 
     private var reminderSubtitle: LocalizedStringKey {
-        switch reminderAccess {
-        case .allowed:
+        switch permissions.notifications {
+        case .granted:
             return plan?.notificationsEnabled == true ? "At wind-down and at bedtime" : "Tap to turn on"
         case .denied:
             return "Notifications are off · tap to open Settings"
-        case .notDetermined:
+        case .notDetermined, .failed:
             return "Tap to allow notifications"
         }
+    }
+
+    private var quietAppsNoticeMessage: LocalizedStringKey {
+        switch permissions.screenTime {
+        case .granted: "No apps are chosen yet, so nothing will be quieted."
+        case .denied: "Screen Time access was declined, so no apps will be quieted."
+        case .failed: "Screen Time isn't available right now, so no apps will be quieted."
+        case .notDetermined: "Allow Screen Time so Snoozly can quiet your apps."
+        }
+    }
+
+    private var quietAppsNoticeAction: LocalizedStringKey {
+        permissions.screenTime == .granted ? "Choose" : PermissionKind.screenTime.actionTitle(for: permissions.screenTime)
+    }
+
+    private var remindersNoticeMessage: LocalizedStringKey {
+        switch permissions.notifications {
+        case .granted: "Reminders are paused, so nothing will arrive."
+        case .denied: "Notifications are off for Snoozly, so nothing will arrive."
+        case .notDetermined, .failed: "Allow notifications so reminders can arrive."
+        }
+    }
+
+    private var remindersNoticeAction: LocalizedStringKey {
+        permissions.notifications == .granted ? "Turn On" : PermissionKind.notifications.actionTitle(for: permissions.notifications)
     }
 
     private func windDownCard(for night: NightPlan) -> some View {
@@ -365,7 +476,7 @@ struct ScheduleView: View {
             VStack(spacing: 14) {
                 HStack(spacing: 8) {
                     Button {
-                        chooseQuietApps(for: night)
+                        chooseQuietApps()
                     } label: {
                         SettingsRow(icon: "hourglass", title: "Quiet Apps", subtitle: quietAppsSubtitle, tint: Color.moonlightBlue)
                     }
@@ -375,8 +486,8 @@ struct ScheduleView: View {
                         get: { night.quietAppsEnabled },
                         set: { newValue in
                             night.quietAppsEnabled = newValue
-                            if newValue, let plan, !ScreenTimeService.isReady(for: plan) {
-                                chooseQuietApps(for: night)
+                            if newValue, permissions.screenTime != .denied, !permissions.quietAppsReady(for: plan) {
+                                chooseQuietApps()
                             }
                         }
                     )) {
@@ -384,6 +495,16 @@ struct ScheduleView: View {
                     }
                     .labelsHidden()
                     .tint(Color.dreamPurple)
+                }
+
+                if night.quietAppsEnabled && !permissions.quietAppsReady(for: plan) {
+                    AccessNotice(
+                        message: quietAppsNoticeMessage,
+                        actionTitle: quietAppsNoticeAction,
+                        isBusy: permissions.isPreparingScreenTime
+                    ) {
+                        chooseQuietApps()
+                    }
                 }
 
                 RowDivider()
@@ -400,7 +521,7 @@ struct ScheduleView: View {
                         get: { night.remindersEnabled },
                         set: { newValue in
                             night.remindersEnabled = newValue
-                            if newValue, !(plan?.notificationsEnabled == true && reminderAccess == .allowed) {
+                            if newValue, permissions.notifications != .denied, !permissions.remindersActive(for: plan) {
                                 enableReminders()
                             }
                         }
@@ -410,28 +531,37 @@ struct ScheduleView: View {
                     .labelsHidden()
                     .tint(Color.dreamPurple)
                 }
+
+                if night.remindersEnabled && !permissions.remindersActive(for: plan) {
+                    AccessNotice(
+                        message: remindersNoticeMessage,
+                        actionTitle: remindersNoticeAction
+                    ) {
+                        enableReminders()
+                    }
+                }
             }
         }
         .padding(18)
         .nightCard(cornerRadius: 28)
+        .animation(.spring(response: 0.45, dampingFraction: 0.8), value: permissions.screenTime)
+        .animation(.spring(response: 0.45, dampingFraction: 0.8), value: permissions.notifications)
+        .animation(.spring(response: 0.45, dampingFraction: 0.8), value: night.quietAppsEnabled)
+        .animation(.spring(response: 0.45, dampingFraction: 0.8), value: night.remindersEnabled)
     }
 
     // MARK: - Setup Actions
 
     private func enableReminders() {
-        guard let plan else { return }
         Task {
-            await NotificationManager.shared.turnOnReminders(for: plan)
-            reminderAccess = await NotificationManager.shared.access()
+            await permissions.allowNotifications(for: plan)
         }
     }
 
-    private func chooseQuietApps(for night: NightPlan) {
+    private func chooseQuietApps() {
         Task {
-            if await ScreenTimeService.prepareForPicker() {
+            if await permissions.allowScreenTime() {
                 showQuietPicker = true
-            } else {
-                night.quietAppsEnabled = false
             }
         }
     }

@@ -272,16 +272,17 @@ struct InfoChip: View {
     var tint: Color = Color.lavendar
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .bold))
 
             Text(text)
                 .font(.system(.caption, design: .rounded, weight: .bold))
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .foregroundStyle(tint)
-        .padding(.horizontal, 11)
+        .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Capsule().fill(tint.opacity(0.14)))
         .overlay {

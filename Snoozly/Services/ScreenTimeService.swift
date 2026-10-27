@@ -18,19 +18,40 @@ enum ScreenTimeService {
 
     // MARK: - Authorization
 
+    static let pickerSettleDelay: Duration = .milliseconds(250)
+
     static var isAuthorized: Bool {
         AuthorizationCenter.shared.authorizationStatus == .approved
     }
 
+    static var status: PermissionStatus {
+        switch AuthorizationCenter.shared.authorizationStatus {
+        case .approved: .granted
+        case .denied: .denied
+        case .notDetermined: .notDetermined
+        @unknown default: .notDetermined
+        }
+    }
+
     static func requestAuthorization() async -> Bool {
-        if isAuthorized { return true }
+        await requestAccess() == .granted
+    }
+
+    static func requestAccess() async -> PermissionStatus {
+        if isAuthorized { return .granted }
 
         do {
             try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
-            return isAuthorized
+            return status
         } catch {
             log.error("Screen Time authorization failed: \(error.localizedDescription)")
-            return false
+
+            if isAuthorized { return .granted }
+
+            if let familyError = error as? FamilyControlsError, familyError == .authorizationCanceled {
+                return status
+            }
+            return status == .denied ? .denied : .failed
         }
     }
 
@@ -41,14 +62,15 @@ enum ScreenTimeService {
         AppGroup.defaults.set(data, forKey: AppGroup.selectionKey)
     }
 
-    static func prepareForPicker() async -> Bool {
+    static func prepareForPicker() async -> PermissionStatus {
         let wasAuthorized = isAuthorized
-        guard await requestAuthorization() else { return false }
+        let result = await requestAccess()
+        guard result == .granted else { return result }
 
         if !wasAuthorized {
-            try? await Task.sleep(for: .milliseconds(900))
+            try? await Task.sleep(for: pickerSettleDelay)
         }
-        return true
+        return .granted
     }
 
     static func savedSelection(for plan: SleepPlan) -> FamilyActivitySelection {
