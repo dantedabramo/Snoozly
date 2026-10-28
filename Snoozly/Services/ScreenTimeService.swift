@@ -29,6 +29,7 @@ enum ScreenTimeService {
         case .approved: .granted
         case .denied: .denied
         case .notDetermined: .notDetermined
+        case .restricted: .denied
         @unknown default: .notDetermined
         }
     }
@@ -162,7 +163,11 @@ enum ScreenTimeService {
         var failed = false
 
         for night in plan.sortedNights where night.isEnabled {
-            let window = quietWindow(for: night, windDownMinutes: plan.windDownMinutes)
+            let window = quietWindow(
+                for: night,
+                windDownMinutes: plan.windDownMinutes,
+                snoozeMinutes: plan.effectiveSnoozeMinutes(for: night)
+            )
             let schedule = DeviceActivitySchedule(
                 intervalStart: window.start,
                 intervalEnd: window.end,
@@ -206,7 +211,11 @@ enum ScreenTimeService {
         let calendar = Calendar.current
 
         for night in plan.sortedNights where night.isEnabled {
-            let window = quietWindow(for: night, windDownMinutes: plan.windDownMinutes)
+            let window = quietWindow(
+                for: night,
+                windDownMinutes: plan.windDownMinutes,
+                snoozeMinutes: plan.effectiveSnoozeMinutes(for: night)
+            )
 
             guard let start = calendar.nextDate(after: now,
                                                 matching: window.start,
@@ -225,7 +234,8 @@ enum ScreenTimeService {
     }
 
     private static func quietWindow(for night: NightPlan,
-                                    windDownMinutes: Int) -> (start: DateComponents, end: DateComponents) {
+                                    windDownMinutes: Int,
+                                    snoozeMinutes: Int) -> (start: DateComponents, end: DateComponents) {
         let bedtimeDay = night.weekday.shifted(by: night.bedtimeMinutes < 6 * 60 ? 1 : 0)
 
         let startMinutes = night.bedtimeMinutes - windDownMinutes
@@ -238,9 +248,10 @@ enum ScreenTimeService {
         start.minute = startWrapped % 60
 
         var end = DateComponents()
-        end.weekday = night.weekday.shifted(by: 1).calendarWeekday
-        end.hour = night.wakeMinutes / 60
-        end.minute = night.wakeMinutes % 60
+        let endMinutes = night.wakeMinutes + snoozeMinutes
+        end.weekday = night.weekday.shifted(by: 1 + endMinutes / (24 * 60)).calendarWeekday
+        end.hour = (endMinutes % (24 * 60)) / 60
+        end.minute = endMinutes % 60
 
         return (start, end)
     }

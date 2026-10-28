@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import StoreKit
+import UIKit
 
 // MARK: - SettingsView
 
@@ -16,7 +17,9 @@ struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppStorageKey.profileName) private var profileName = ""
     @AppStorage(AppStorageKey.profileIcon) private var profileIcon = "moon.stars.fill"
+    @AppStorage(AppStorageKey.profileImageData) private var profileImageData = Data()
     @AppStorage(AppStorageKey.sleepGoalMinutes) private var sleepGoalMinutes = 480
+    @AppStorage(AppStorageKey.sleepTrendGoal) private var sleepTrendGoal = 80
 
     @State private var proManager = ProManager.shared
     @State private var showProfileSheet = false
@@ -35,7 +38,7 @@ struct SettingsView: View {
 
     private var versionText: String {
         let info = Bundle.main.infoDictionary
-        let version = info?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let version = info?["CFBundleShortVersionString"] as? String ?? "1.1"
         let build = info?["CFBundleVersion"] as? String ?? "1"
         return "\(version) (\(build))"
     }
@@ -154,9 +157,17 @@ struct SettingsView: View {
                         }
                         .shadow(color: Color.dreamPurple.opacity(0.55), radius: 14)
 
-                    Image(systemName: profileIcon.isEmpty ? "moon.stars.fill" : profileIcon)
-                        .font(.system(size: 27, weight: .semibold))
-                        .foregroundStyle(Color.starlightGold)
+                    if let image = UIImage(data: profileImageData) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 64, height: 64)
+                            .clipShape(Circle())
+                    } else {
+                        Image(systemName: profileIcon.isEmpty ? "moon.stars.fill" : profileIcon)
+                            .font(.system(size: 27, weight: .semibold))
+                            .foregroundStyle(Color.starlightGold)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -239,6 +250,12 @@ struct SettingsView: View {
         SettingsSection("SLEEP", footer: "Snooze length applies to every alarm. Turn snooze on or off for each morning in Schedule.") {
             SettingsRow(icon: "moon.fill", title: "Sleep Goal", tint: Color.lavendar) {
                 menuPicker("Sleep Goal", selection: $sleepGoalMinutes, options: sleepGoalOptions) { "\($0 / 60) hrs" }
+            }
+
+            RowDivider()
+
+            SettingsRow(icon: "chart.line.uptrend.xyaxis", title: "Sleep Trend Goal", subtitle: "Target score shown on your Progress trend", tint: Color.restfulMint) {
+                menuPicker("Sleep Trend Goal", selection: $sleepTrendGoal, options: [60, 70, 80, 90, 100]) { "\($0)" }
             }
 
             RowDivider()
