@@ -100,9 +100,6 @@ struct ContentView: View {
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
             await permissions.refresh()
-            if hasHandledLaunch, proManager.isPro, activeSheet == nil, shouldShowMorningCheckIn {
-                activeSheet = .checkIn
-            }
         }
         .task(id: reminderKey) {
             guard scenePhase == .active, let plan = plans.first else { return }
@@ -137,24 +134,10 @@ struct ContentView: View {
         try? await Task.sleep(for: .milliseconds(450))
 
         if proManager.isPro {
-            if shouldShowMorningCheckIn {
-                activeSheet = .checkIn
-            } else {
-                runPendingQuickAction()
-            }
+            runPendingQuickAction()
         } else {
             activeSheet = .pro
         }
-    }
-
-    private var shouldShowMorningCheckIn: Bool {
-        guard checkIns.first(where: { Calendar.current.isDateInToday($0.date) }) == nil,
-              let plan = plans.first,
-              let lastNight = plan.night(forMorning: Weekday(date: .now)),
-              lastNight.isEnabled else { return false }
-
-        let now = Date.now.minutesAfterMidnight
-        return now >= lastNight.wakeMinutes
     }
 
     // MARK: - Review Prompt

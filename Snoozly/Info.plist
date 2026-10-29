@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSCameraUsageDescription</key>
-	<string>Snoozly uses your camera for your optional profile photo.</string>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>Snoozly rings the wake-up alarm at the time you choose, even when your phone is silent.</string>
 	<key>UIApplicationShortcutItems</key>

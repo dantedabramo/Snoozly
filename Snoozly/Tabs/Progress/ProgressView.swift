@@ -15,7 +15,6 @@ struct ProgressView: View {
     @Query(sort: \SleepCheckIn.date, order: .reverse) private var checkIns: [SleepCheckIn]
     @Environment(\.modelContext) private var modelContext
     @AppStorage(AppStorageKey.sleepGoalMinutes) private var sleepGoalMinutes = 480
-    @AppStorage(AppStorageKey.sleepTrendGoal) private var sleepTrendGoal = 80
     @State private var proManager = ProManager.shared
     @State private var selectedRange: TimeRange = .sevenDays
     @State private var showCheckInSheet = false
@@ -189,7 +188,7 @@ struct ProgressView: View {
     }
 
     private var goalScore: Int {
-        sleepTrendGoal
+        80
     }
 
     private var goalHoursText: String {

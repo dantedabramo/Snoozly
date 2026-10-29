@@ -20,7 +20,7 @@ struct TonightView: View {
     @State private var proManager = ProManager.shared
     @State private var showProSheet = false
     @State private var showScheduleSheet = false
-    @State private var selectedUpcomingOffset: Int?
+    @State private var upcomingSelection: UpcomingSelection?
     @State private var showQuietPicker = false
     @State private var sheetWeekday: Weekday = .today
     @State private var permissions = PermissionCenter.shared
@@ -28,6 +28,12 @@ struct TonightView: View {
     @ScaledMetric(relativeTo: .largeTitle) private var heroTimeSize: CGFloat = 48
 
     private let gutter: CGFloat = 20
+
+    private struct UpcomingSelection: Identifiable {
+        let dayOffset: Int
+
+        var id: Int { dayOffset }
+    }
 
     private var plan: SleepPlan? {
         plans.first
@@ -42,7 +48,6 @@ struct TonightView: View {
     }
 
     private func setSkipped(_ skipped: Bool) {
-        Haptics.impact(skipped ? .heavy : .medium, intensity: skipped ? 0.9 : 0.65)
         skipDateString = skipped ? TonightSkip.nightKey : ""
     }
 
@@ -148,6 +153,9 @@ struct TonightView: View {
         }
         .sheet(isPresented: $showScheduleSheet) {
             ScheduleView(selectedWeekday: $sheetWeekday)
+        }
+        .sheet(item: $upcomingSelection) { selection in
+            upcomingSheet(for: selection.dayOffset)
         }
         .quietAppsPicker(for: plan, isPresented: $showQuietPicker)
         .task(id: scenePhase) {
@@ -263,9 +271,9 @@ struct TonightView: View {
             HStack(spacing: 8) {
                 InfoChip(icon: "clock.fill", text: windDownCountdown, tint: Color.starlightGold)
 
-                if !isTonightSkipped, let night, isOn, night.alarmEnabled, permissions.alarms == .granted {
+                if let night, isOn, night.alarmEnabled, permissions.alarms == .granted {
                     InfoChip(icon: "alarm.fill", text: "Alarm \(night.wakeMinutes.clockText)", tint: Color.lavendar)
-                } else if !isTonightSkipped, let night, isOn, night.alarmEnabled {
+                } else if let night, isOn, night.alarmEnabled {
                     InfoChip(icon: "exclamationmark.circle.fill", text: "Alarm needs access", tint: Color.dreamCoral)
                 } else {
                     InfoChip(icon: "alarm", text: "No Alarm", tint: Color.lavendar.opacity(0.6))
@@ -554,11 +562,6 @@ struct TonightView: View {
             .contentMargins(.horizontal, gutter, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollClipDisabled()
-
-            if let selectedUpcomingOffset {
-                upcomingDetail(for: selectedUpcomingOffset)
-                    .padding(.horizontal, gutter)
-            }
         }
     }
 
@@ -567,7 +570,7 @@ struct TonightView: View {
         return Calendar.current.date(byAdding: .day, value: dayOffset, to: base) ?? base
     }
 
-    private func upcomingDetail(for dayOffset: Int) -> some View {
+    private func upcomingSheet(for dayOffset: Int) -> some View {
         let targetDay = tonightWeekday.shifted(by: dayOffset)
         let night = plan?.sortedNights.first { $0.weekday == targetDay }
 
@@ -578,25 +581,10 @@ struct TonightView: View {
             isTonight: dayOffset == 0,
             isSkipped: dayOffset == 0 && isTonightSkipped
         ) {
-            selectedUpcomingOffset = nil
+            upcomingSelection = nil
             Task {
                 try? await Task.sleep(for: .milliseconds(350))
                 showSchedule(targetDay)
-            }
-        }
-        .overlay(alignment: .top) {
-            if dayOffset != 0 {
-                Button("Show Tonight") {
-                    withAnimation(.snappy) {
-                        selectedUpcomingOffset = 0
-                    }
-                }
-                .font(.system(.subheadline, design: .rounded, weight: .bold))
-                .foregroundStyle(Color.midnightNavy)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 9)
-                .background(Capsule().fill(NightGradient.gold))
-                .offset(y: -14)
             }
         }
     }
@@ -612,10 +600,7 @@ struct TonightView: View {
 
         return Button {
             if isUnlocked {
-                withAnimation(.snappy) {
-                    selectedUpcomingOffset = dayOffset
-                }
-                Haptics.selection()
+                upcomingSelection = UpcomingSelection(dayOffset: dayOffset)
             } else {
                 showProSheet = true
             }
@@ -657,13 +642,6 @@ struct TonightView: View {
                 }
             }
             .nightCard(cornerRadius: 24, tint: isToday ? Color.dreamPurple : nil, blurs: false)
-            .overlay {
-                if selectedUpcomingOffset == dayOffset {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(NightGradient.gold, lineWidth: 3)
-                        .shadow(color: Color.starlightGold.opacity(0.55), radius: 10)
-                }
-            }
         }
         .buttonStyle(PressScaleButtonStyle())
         .accessibilityElement(children: .combine)
