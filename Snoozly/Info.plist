@@ -4,6 +4,8 @@
 <dict>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>Snoozly rings the wake-up alarm at the time you choose, even when your phone is silent.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Snoozly uses the camera so you can take a profile picture.</string>
 	<key>UIApplicationShortcutItems</key>
 	<array>
 		<dict>

@@ -83,7 +83,7 @@ private struct OnboardingFlow: View {
         .background {
             NightBackground(mood: .calm)
         }
-        .sensoryFeedback(.selection, trigger: step)
+        .haptic(.sheetOpen, trigger: step)
         .onAppear(perform: refreshSteps)
         .task(id: isReady) {
             guard isReady else { return }

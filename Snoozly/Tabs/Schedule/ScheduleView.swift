@@ -199,6 +199,7 @@ struct ScheduleView: View {
                 }
                 .labelsHidden()
                 .tint(Color.dreamPurple)
+                .toggleHaptic(night.isEnabled)
             }
 
             if night.isEnabled {
@@ -254,6 +255,7 @@ struct ScheduleView: View {
                             }
                             .labelsHidden()
                             .tint(Color.dreamPurple)
+                            .toggleHaptic(night.alarmEnabled)
                         }
 
                         if night.alarmEnabled && permissions.alarms != .granted {
@@ -393,6 +395,7 @@ struct ScheduleView: View {
             .labelsHidden()
             .tint(Color.dreamPurple)
             .disabled(!hasLength)
+            .toggleHaptic(night.snoozeEnabled)
         }
     }
 
@@ -495,6 +498,7 @@ struct ScheduleView: View {
                     }
                     .labelsHidden()
                     .tint(Color.dreamPurple)
+                    .toggleHaptic(night.quietAppsEnabled)
                 }
 
                 if night.quietAppsEnabled && !permissions.quietAppsReady(for: plan) {
@@ -530,6 +534,7 @@ struct ScheduleView: View {
                     }
                     .labelsHidden()
                     .tint(Color.dreamPurple)
+                    .toggleHaptic(night.remindersEnabled)
                 }
 
                 if night.remindersEnabled && !permissions.remindersActive(for: plan) {
@@ -580,7 +585,7 @@ struct ScheduleView: View {
             night.quietAppsEnabled = current.quietAppsEnabled
             night.remindersEnabled = current.remindersEnabled
         }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        Haptics.play(.celebrate)
     }
 }
 
@@ -602,7 +607,7 @@ private struct WeekStrip: View {
                 dayChip(for: night)
             }
         }
-        .sensoryFeedback(.selection, trigger: taps)
+        .haptic(.tab, trigger: taps)
     }
 
     private func dayChip(for night: NightPlan) -> some View {

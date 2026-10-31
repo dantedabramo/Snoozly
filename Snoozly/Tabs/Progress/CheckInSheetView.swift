@@ -100,7 +100,8 @@ struct CheckInSheetView: View {
                 }
             }
         }
-        .sensoryFeedback(.success, trigger: saveCount)
+        .haptic(.celebrate, trigger: saveCount)
+        .presentationHaptic()
         .onAppear(perform: loadInitialValues)
     }
 
@@ -160,7 +161,7 @@ struct CheckInSheetView: View {
                             }
 
                             Text(option.rawValue)
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .scaledFont(size: 11, weight: .bold, design: .rounded)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                                 .padding(.horizontal, 2)
@@ -176,7 +177,7 @@ struct CheckInSheetView: View {
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
-            .sensoryFeedback(.selection, trigger: feel)
+            .haptic(.select, trigger: feel)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 16)
@@ -221,7 +222,7 @@ struct CheckInSheetView: View {
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
-            .sensoryFeedback(.selection, trigger: quality)
+            .haptic(.tab, trigger: quality)
         }
         .padding(18)
         .nightCard(cornerRadius: 28)
@@ -237,7 +238,7 @@ struct CheckInSheetView: View {
                 Spacer()
 
                 Text(Int(hours * 60).durationText)
-                    .font(.system(size: 24, weight: .heavy, design: .rounded))
+                    .scaledFont(size: 24, weight: .heavy, design: .rounded)
                     .foregroundStyle(Color.starlightGold)
                     .monospacedDigit()
                     .contentTransition(.numericText(value: hours))
@@ -256,7 +257,7 @@ struct CheckInSheetView: View {
                     hours = min(14, hours + 0.5)
                 }
             }
-            .sensoryFeedback(.selection, trigger: hours)
+            .haptic(.scrub, trigger: hours)
 
             Text(goalComparison)
                 .font(.system(.caption, design: .rounded, weight: .medium))
@@ -351,7 +352,8 @@ struct CheckInSheetView: View {
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
-            .sensoryFeedback(.selection, trigger: factors.count)
+            .haptic(.toggleOn, trigger: factors.count) { old, new in new > old }
+            .haptic(.toggleOff, trigger: factors.count) { old, new in new < old }
         }
         .padding(18)
         .nightCard(cornerRadius: 28)

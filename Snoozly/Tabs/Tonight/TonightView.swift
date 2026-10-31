@@ -20,55 +20,104 @@ struct TonightView: View {
     @State private var proManager = ProManager.shared
     @State private var showProSheet = false
     @State private var showScheduleSheet = false
-    @State private var upcomingSelection: UpcomingSelection?
     @State private var showQuietPicker = false
     @State private var sheetWeekday: Weekday = .today
+    @State private var selectedEvening: Date?
     @State private var permissions = PermissionCenter.shared
     @State private var appeared = false
     @ScaledMetric(relativeTo: .largeTitle) private var heroTimeSize: CGFloat = 48
 
     private let gutter: CGFloat = 20
-
-    private struct UpcomingSelection: Identifiable {
-        let dayOffset: Int
-
-        var id: Int { dayOffset }
-    }
-
-    private var plan: SleepPlan? {
-        plans.first
-    }
-
-    private var tonightWeekday: Weekday {
-        Weekday(date: Calendar.current.date(byAdding: .hour, value: -6, to: .now) ?? .now)
-    }
-
-    private var isTonightSkipped: Bool {
-        skipDateString == TonightSkip.nightKey
-    }
-
-    private func setSkipped(_ skipped: Bool) {
-        skipDateString = skipped ? TonightSkip.nightKey : ""
-    }
-
-    private func showSchedule(_ weekday: Weekday? = nil) {
-        if let onShowSchedule {
-            onShowSchedule(weekday)
-        } else {
-            sheetWeekday = weekday ?? tonightWeekday
-            showScheduleSheet = true
-        }
-    }
-
-    private var tonightNight: NightPlan? {
-        plan?.sortedNights.first { $0.weekday == tonightWeekday }
-    }
+    private let topAnchor = "tonight.top"
 
     private enum RowStatus {
         case on
         case off
         case needsSetup
     }
+
+    // MARK: - Night Selection
+
+    private var plan: SleepPlan? {
+        plans.first
+    }
+
+    private var currentNight: NightRef {
+        NightClock.current(plan: plan)
+    }
+
+    private var displayedNight: NightRef {
+        guard let selectedEvening else { return currentNight }
+        let day = Calendar.current.startOfDay(for: selectedEvening)
+        return day > currentNight.evening ? NightRef(evening: day) : currentNight
+    }
+
+    private var isViewingCurrent: Bool {
+        displayedNight == currentNight
+    }
+
+    private var displayedWeekday: Weekday {
+        displayedNight.weekday
+    }
+
+    private var displayedPlan: NightPlan? {
+        NightClock.night(on: displayedNight, in: plan)
+    }
+
+    private var isCurrentSkipped: Bool {
+        skipDateString == currentNight.key
+    }
+
+    private var isDisplayedSkipped: Bool {
+        isViewingCurrent && isCurrentSkipped
+    }
+
+    private func setSkipped(_ skipped: Bool) {
+        skipDateString = skipped ? currentNight.key : ""
+        Haptics.play(skipped ? .skip : .resume)
+    }
+
+    private func showSchedule(_ weekday: Weekday? = nil) {
+        let target = weekday ?? displayedWeekday
+
+        if let onShowSchedule {
+            onShowSchedule(target)
+        } else {
+            sheetWeekday = target
+            showScheduleSheet = true
+        }
+    }
+
+    private func select(_ ref: NightRef, isUnlocked: Bool, proxy: ScrollViewProxy) {
+        guard isUnlocked else {
+            Haptics.play(.warning)
+            showProSheet = true
+            return
+        }
+
+        guard ref != displayedNight else {
+            Haptics.play(.tap)
+            return
+        }
+
+        Haptics.play(.select)
+
+        withAnimation(.snappy) {
+            selectedEvening = ref == currentNight ? nil : ref.evening
+            proxy.scrollTo(topAnchor, anchor: .top)
+        }
+    }
+
+    private func showTonight(proxy: ScrollViewProxy) {
+        Haptics.play(.confirm)
+
+        withAnimation(.snappy) {
+            selectedEvening = nil
+            proxy.scrollTo(topAnchor, anchor: .top)
+        }
+    }
+
+    // MARK: - Text
 
     private var greetingText: String {
         let hour = Calendar.current.component(.hour, from: .now)
@@ -89,26 +138,42 @@ struct TonightView: View {
         }
     }
 
-    private var formattedDate: String {
-        Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day())
+    private var headerDateText: String {
+        let date = isViewingCurrent ? Date.now : displayedNight.evening
+        return date.formatted(.dateTime.weekday(.wide).month(.wide).day())
     }
 
-    private var windDownCountdown: String {
-        guard let tonight = tonightNight, tonight.isEnabled, !isTonightSkipped else {
-            return "No Wind Down"
+    private var headerTitle: String {
+        isViewingCurrent ? greetingText : "\(displayedWeekday.fullName) Night"
+    }
+
+    private func durationLabel(_ minutes: Int) -> String {
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        return hours > 0 ? "\(hours)h \(remainder)min" : "\(remainder)min"
+    }
+
+    private func windDownChip(night: NightPlan?, isOn: Bool) -> InfoChip {
+        guard let night, isOn, !isDisplayedSkipped else {
+            return InfoChip(icon: "clock.fill", text: "No Wind Down", tint: Color.starlightGold)
         }
-        let windDownMinutes = tonight.bedtimeMinutes - (plan?.windDownMinutes ?? 30)
-        let nowMinutes = Date.now.minutesAfterMidnight
-        var diff = windDownMinutes - nowMinutes
-        if diff < 0 {
-            diff += 24 * 60
+
+        let windDownMinutes = plan?.windDownMinutes ?? 30
+
+        guard isViewingCurrent else {
+            let start = (night.bedtimeMinutes - windDownMinutes + 24 * 60) % (24 * 60)
+            return InfoChip(icon: "clock.fill", text: "Wind Down \(start.clockText)", tint: Color.starlightGold)
         }
-        let hours = diff / 60
-        let mins = diff % 60
-        if hours > 0 {
-            return "Wind Down in \(hours)h \(mins)min"
-        } else {
-            return "Wind Down in \(mins)min"
+
+        switch night.phase(evening: displayedNight.evening, windDownMinutes: windDownMinutes) {
+        case .beforeWindDown(let minutes):
+            return InfoChip(icon: "clock.fill", text: "Wind Down in \(durationLabel(minutes))", tint: Color.starlightGold)
+        case .windDown(let minutes):
+            return InfoChip(icon: "wind", text: "Bed in \(durationLabel(minutes))", tint: Color.moonlightBlue)
+        case .asleep(let minutes):
+            return InfoChip(icon: "moon.zzz.fill", text: "Wake in \(durationLabel(minutes))", tint: Color.lavendar)
+        case .finished:
+            return InfoChip(icon: "clock.fill", text: "No Wind Down", tint: Color.starlightGold)
         }
     }
 
@@ -118,44 +183,49 @@ struct TonightView: View {
         ZStack {
             NightBackground(mood: .tonight)
 
-            ScrollView {
-                TimelineView(.everyMinute) { _ in
-                    VStack(alignment: .leading, spacing: 24) {
-                        headerSection
-                            .padding(.horizontal, gutter)
-                            .reveal(appeared, delay: 0)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    TimelineView(.everyMinute) { _ in
+                        VStack(alignment: .leading, spacing: 24) {
+                            headerSection(proxy: proxy)
+                                .padding(.horizontal, gutter)
+                                .reveal(appeared, delay: 0)
+                                .id(topAnchor)
 
-                        heroCard
-                            .padding(.horizontal, gutter)
-                            .reveal(appeared, delay: 0.06)
+                            heroCard
+                                .padding(.horizontal, gutter)
+                                .reveal(appeared, delay: 0.06)
+                                .id("hero.\(displayedNight.key)")
+                                .transition(.opacity.combined(with: .scale(scale: 0.97)))
 
-                        holdToSkipButton
-                            .padding(.horizontal, gutter)
-                            .reveal(appeared, delay: 0.12)
+                            if isViewingCurrent {
+                                holdToSkipButton
+                                    .padding(.horizontal, gutter)
+                                    .reveal(appeared, delay: 0.12)
+                                    .transition(.opacity)
+                            }
 
-                        remindersAndAlarmsSection
-                            .padding(.horizontal, gutter)
-                            .reveal(appeared, delay: 0.18)
+                            remindersAndAlarmsSection
+                                .padding(.horizontal, gutter)
+                                .reveal(appeared, delay: 0.18)
 
-                        upcomingNightsSection
-                            .reveal(appeared, delay: 0.24)
+                            upcomingNightsSection(proxy: proxy)
+                                .reveal(appeared, delay: 0.24)
+                        }
+                        .padding(.vertical, 16)
                     }
-                    .padding(.vertical, 16)
                 }
+                .scrollIndicators(.hidden)
+                .contentMargins(.bottom, 24, for: .scrollContent)
+                .scrollEdgeEffectStyle(.soft, for: .bottom)
             }
-            .scrollIndicators(.hidden)
-            .contentMargins(.bottom, 24, for: .scrollContent)
-            .scrollEdgeEffectStyle(.soft, for: .bottom)
         }
         .revealOnAppear($appeared)
-        .sheet(isPresented: $showProSheet) {
+        .fullScreenCover(isPresented: $showProSheet) {
             ProSheetView()
         }
         .sheet(isPresented: $showScheduleSheet) {
             ScheduleView(selectedWeekday: $sheetWeekday)
-        }
-        .sheet(item: $upcomingSelection) { selection in
-            upcomingSheet(for: selection.dayOffset)
         }
         .quietAppsPicker(for: plan, isPresented: $showQuietPicker)
         .task(id: scenePhase) {
@@ -166,21 +236,39 @@ struct TonightView: View {
 
     // MARK: - Header
 
-    private var headerSection: some View {
+    private func headerSection(proxy: ScrollViewProxy) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(formattedDate)
+            Text(headerDateText)
                 .font(.system(.footnote, design: .rounded, weight: .heavy))
                 .textCase(.uppercase)
                 .tracking(1.4)
                 .foregroundStyle(Color.starlightGold)
 
-            Text(greetingText)
+            Text(headerTitle)
                 .font(.system(.largeTitle, design: .rounded, weight: .heavy))
                 .foregroundStyle(.white)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
+
+            if !isViewingCurrent {
+                Button {
+                    showTonight(proxy: proxy)
+                } label: {
+                    Label("Show Tonight", systemImage: "moon.stars.fill")
+                        .font(.system(.subheadline, design: .rounded, weight: .heavy))
+                        .foregroundStyle(Color.midnightNavy)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 9)
+                        .background(Capsule().fill(NightGradient.gold))
+                        .shadow(color: Color.starlightGold.opacity(0.4), radius: 12, y: 4)
+                }
+                .buttonStyle(PressScaleButtonStyle())
+                .padding(.top, 6)
+                .accessibilityHint("Goes back to tonight's schedule")
+                .transition(.scale(scale: 0.85, anchor: .leading).combined(with: .opacity))
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -188,15 +276,15 @@ struct TonightView: View {
     // MARK: - Hero Card
 
     private var heroCard: some View {
-        let night = tonightNight
+        let night = displayedPlan
         let isOn = night?.isEnabled == true
 
         return ZStack {
             heroContent(night: night, isOn: isOn)
-                .opacity(isTonightSkipped ? 0.4 : 1.0)
-                .grayscale(isTonightSkipped ? 0.8 : 0.0)
+                .opacity(isDisplayedSkipped ? 0.4 : 1.0)
+                .grayscale(isDisplayedSkipped ? 0.8 : 0.0)
 
-            if isTonightSkipped {
+            if isDisplayedSkipped {
                 Label("Skipped Tonight", systemImage: "moon.zzz.fill")
                     .font(.system(.subheadline, design: .rounded, weight: .heavy))
                     .foregroundStyle(Color.midnightNavy)
@@ -207,15 +295,17 @@ struct TonightView: View {
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: isTonightSkipped)
+        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: isDisplayedSkipped)
         .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 32, style: .continuous))
         .contextMenu {
-            Button {
-                withAnimation(.snappy) {
-                    setSkipped(!isTonightSkipped)
+            if isViewingCurrent {
+                Button {
+                    withAnimation(.snappy) {
+                        setSkipped(!isCurrentSkipped)
+                    }
+                } label: {
+                    Label(isCurrentSkipped ? "Resume Tonight" : "Skip Tonight", systemImage: isCurrentSkipped ? "arrow.counterclockwise" : "moon.zzz.fill")
                 }
-            } label: {
-                Label(isTonightSkipped ? "Resume Tonight" : "Skip Tonight", systemImage: isTonightSkipped ? "arrow.counterclockwise" : "moon.zzz.fill")
             }
 
             Button {
@@ -263,23 +353,25 @@ struct TonightView: View {
             if let night, isOn {
                 sleepTimeline(night: night)
             } else {
-                Text("No bedtime scheduled for tonight.")
+                Text(isViewingCurrent ? "No bedtime scheduled for tonight." : "No bedtime scheduled for this night.")
                     .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(Color.lavendar.opacity(0.75))
             }
 
-            HStack(spacing: 8) {
-                InfoChip(icon: "clock.fill", text: windDownCountdown, tint: Color.starlightGold)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    windDownChip(night: night, isOn: isOn)
 
-                if let night, isOn, night.alarmEnabled, permissions.alarms == .granted {
-                    InfoChip(icon: "alarm.fill", text: "Alarm \(night.wakeMinutes.clockText)", tint: Color.lavendar)
-                } else if let night, isOn, night.alarmEnabled {
-                    InfoChip(icon: "exclamationmark.circle.fill", text: "Alarm needs access", tint: Color.dreamCoral)
-                } else {
-                    InfoChip(icon: "alarm", text: "No Alarm", tint: Color.lavendar.opacity(0.6))
+                    alarmChip(night: night, isOn: isOn)
+
+                    Spacer(minLength: 0)
                 }
 
-                Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 8) {
+                    windDownChip(night: night, isOn: isOn)
+
+                    alarmChip(night: night, isOn: isOn)
+                }
             }
         }
         .padding(22)
@@ -290,6 +382,30 @@ struct TonightView: View {
         .clipShape(shape)
         .nightCard(cornerRadius: 32, tint: Color.dreamPurple, elevated: true)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(heroAccessibilityLabel(night: night, isOn: isOn))
+    }
+
+    private func heroAccessibilityLabel(night: NightPlan?, isOn: Bool) -> String {
+        let when = isViewingCurrent ? "Tonight" : "\(displayedWeekday.fullName) night"
+
+        guard let night, isOn else { return "\(when). No bedtime scheduled." }
+        if isDisplayedSkipped { return "\(when) is skipped. Alarm, reminders and Quiet Apps are off." }
+
+        let alarm = night.alarmEnabled ? "Alarm at \(night.wakeMinutes.clockText)." : "No alarm."
+        return "\(when). Bedtime \(night.bedtimeMinutes.clockText). Wake-up \(night.wakeMinutes.clockText). \(night.sleepMinutes.durationText) of sleep. \(alarm)"
+    }
+
+    @ViewBuilder
+    private func alarmChip(night: NightPlan?, isOn: Bool) -> some View {
+        if let night, isOn, night.alarmEnabled, !isDisplayedSkipped {
+            if permissions.alarms == .granted {
+                InfoChip(icon: "alarm.fill", text: "Alarm \(night.wakeMinutes.clockText)", tint: Color.lavendar)
+            } else {
+                InfoChip(icon: "exclamationmark.circle.fill", text: "Alarm needs access", tint: Color.dreamCoral)
+            }
+        } else {
+            InfoChip(icon: "alarm", text: "No Alarm", tint: Color.lavendar.opacity(0.6))
+        }
     }
 
     private func sleepTimeline(night: NightPlan) -> some View {
@@ -329,12 +445,13 @@ struct TonightView: View {
 
     private var holdToSkipButton: some View {
         HoldActionButton(
-            title: isTonightSkipped ? "Hold to Resume Tonight" : "Hold to Skip Tonight",
-            systemImage: isTonightSkipped ? "arrow.counterclockwise" : "moon.zzz.fill",
-            isHighlighted: isTonightSkipped
+            title: isCurrentSkipped ? "Hold to Resume Tonight" : "Hold to Skip Tonight",
+            systemImage: isCurrentSkipped ? "arrow.counterclockwise" : "moon.zzz.fill",
+            isHighlighted: isCurrentSkipped,
+            playsCompletionHaptic: false
         ) {
             withAnimation(.snappy) {
-                setSkipped(!isTonightSkipped)
+                setSkipped(!isCurrentSkipped)
             }
         }
     }
@@ -357,6 +474,8 @@ struct TonightView: View {
             .padding(16)
             .nightCard(cornerRadius: 26)
         }
+        .id("reminders.\(displayedNight.key)")
+        .transition(.opacity)
     }
 
     private func statusRow(
@@ -391,29 +510,27 @@ struct TonightView: View {
     // MARK: Status
 
     private var quietAppsStatus: RowStatus {
-        guard let night = tonightNight, night.isEnabled, night.quietAppsEnabled, !isTonightSkipped else { return .off }
+        guard let night = displayedPlan, night.isEnabled, night.quietAppsEnabled, !isDisplayedSkipped else { return .off }
         return permissions.quietAppsReady(for: plan) ? .on : .needsSetup
     }
 
     private var alarmStatus: RowStatus {
-        guard let night = tonightNight, night.isEnabled, night.alarmEnabled, !isTonightSkipped else { return .off }
+        guard let night = displayedPlan, night.isEnabled, night.alarmEnabled, !isDisplayedSkipped else { return .off }
         return permissions.alarms == .granted ? .on : .needsSetup
     }
 
     private var remindersStatus: RowStatus {
-        guard let night = tonightNight, night.isEnabled, night.remindersEnabled, !isTonightSkipped else { return .off }
+        guard let night = displayedPlan, night.isEnabled, night.remindersEnabled, !isDisplayedSkipped else { return .off }
         return permissions.remindersActive(for: plan) ? .on : .needsSetup
     }
 
     // MARK: Rows
 
     private var quietAppsRow: some View {
-        let subtitle: LocalizedStringKey? = quietAppsSubtitle
-
-        return statusRow(
+        statusRow(
             icon: "hourglass",
             title: "Quiet Apps",
-            subtitle: subtitle,
+            subtitle: quietAppsSubtitle,
             tint: Color.moonlightBlue,
             status: quietAppsStatus,
             isTappable: quietAppsStatus == .needsSetup,
@@ -433,18 +550,16 @@ struct TonightView: View {
             case .failed: return "Screen Time isn't available right now. Tap to retry."
             }
         }
-        guard let tonight = tonightNight, tonight.isEnabled, let plan else { return nil }
-        let startMinutes = (tonight.bedtimeMinutes - plan.windDownMinutes + 24 * 60) % (24 * 60)
+        guard let night = displayedPlan, night.isEnabled, night.quietAppsEnabled, !isDisplayedSkipped, let plan else { return nil }
+        let startMinutes = (night.bedtimeMinutes - plan.windDownMinutes + 24 * 60) % (24 * 60)
         return "\(startMinutes.clockText) until wake-up"
     }
 
     private var alarmRow: some View {
-        let subtitle: LocalizedStringKey? = alarmSubtitle
-
-        return statusRow(
+        statusRow(
             icon: "alarm.fill",
             title: "Wake-up Alarm",
-            subtitle: subtitle,
+            subtitle: alarmSubtitle,
             tint: Color.starlightGold,
             status: alarmStatus,
             isTappable: alarmStatus == .needsSetup,
@@ -461,22 +576,20 @@ struct TonightView: View {
             case .granted: return nil
             }
         }
-        guard let tonight = tonightNight, tonight.isEnabled, tonight.alarmEnabled else { return nil }
+        guard let night = displayedPlan, night.isEnabled, night.alarmEnabled, !isDisplayedSkipped else { return nil }
 
-        let minutes = tonight.wakeMinutes.clockText
-        guard let plan, plan.effectiveSnoozeMinutes(for: tonight) > 0 else {
+        let minutes = night.wakeMinutes.clockText
+        guard let plan, plan.effectiveSnoozeMinutes(for: night) > 0 else {
             return "\(minutes) · no snooze"
         }
-        return "\(minutes) · snooze \(plan.effectiveSnoozeMinutes(for: tonight)) min"
+        return "\(minutes) · snooze \(plan.effectiveSnoozeMinutes(for: night)) min"
     }
 
     private var bedtimeRemindersRow: some View {
-        let subtitle: LocalizedStringKey? = remindersSubtitle
-
-        return statusRow(
+        statusRow(
             icon: "bell.badge.fill",
             title: "Bedtime Reminders",
-            subtitle: subtitle,
+            subtitle: remindersSubtitle,
             tint: Color.dreamCoral,
             status: remindersStatus,
             isTappable: remindersStatus == .needsSetup,
@@ -492,8 +605,8 @@ struct TonightView: View {
             case .notDetermined, .failed: return "Tap to allow notifications"
             }
         }
-        guard let tonight = tonightNight, tonight.isEnabled else { return nil }
-        return "\(tonight.bedtimeMinutes.clockText)"
+        guard let night = displayedPlan, night.isEnabled, night.remindersEnabled, !isDisplayedSkipped else { return nil }
+        return "\(night.bedtimeMinutes.clockText)"
     }
 
     private var changeScheduleRow: some View {
@@ -540,12 +653,12 @@ struct TonightView: View {
 
     // MARK: - Upcoming Nights
 
-    private var upcomingNightsSection: some View {
+    private func upcomingNightsSection(proxy: ScrollViewProxy) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 SectionTitle("Upcoming Nights", showsPro: true)
 
-                Text(proManager.isPro ? "Tap a night to see how it looks" : "Unlock Pro to look two weeks ahead")
+                Text(proManager.isPro ? "Tap a night to see it here" : "Unlock Pro to look two weeks ahead")
                     .font(.system(.footnote, design: .rounded))
                     .foregroundStyle(Color.lavendar.opacity(0.7))
             }
@@ -554,10 +667,11 @@ struct TonightView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(0..<14, id: \.self) { dayOffset in
-                        upcomingNightCard(dayOffset: dayOffset)
+                        upcomingNightCard(dayOffset: dayOffset, proxy: proxy)
                     }
                 }
                 .scrollTargetLayout()
+                .padding(.vertical, 10)
             }
             .contentMargins(.horizontal, gutter, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
@@ -565,52 +679,37 @@ struct TonightView: View {
         }
     }
 
-    private func upcomingDate(for dayOffset: Int) -> Date {
-        let base = Calendar.current.date(byAdding: .hour, value: -6, to: .now) ?? .now
-        return Calendar.current.date(byAdding: .day, value: dayOffset, to: base) ?? base
-    }
-
-    private func upcomingSheet(for dayOffset: Int) -> some View {
-        let targetDay = tonightWeekday.shifted(by: dayOffset)
-        let night = plan?.sortedNights.first { $0.weekday == targetDay }
-
-        return UpcomingNightSheet(
-            night: night,
-            plan: plan,
-            date: upcomingDate(for: dayOffset),
-            isTonight: dayOffset == 0,
-            isSkipped: dayOffset == 0 && isTonightSkipped
-        ) {
-            upcomingSelection = nil
-            Task {
-                try? await Task.sleep(for: .milliseconds(350))
-                showSchedule(targetDay)
-            }
-        }
-    }
-
-    private func upcomingNightCard(dayOffset: Int) -> some View {
+    private func upcomingNightCard(dayOffset: Int, proxy: ScrollViewProxy) -> some View {
+        let ref = currentNight.shifted(byDays: dayOffset)
         let isToday = dayOffset == 0
-        let targetDay = tonightWeekday.shifted(by: dayOffset)
-        let night = plan?.sortedNights.first { $0.weekday == targetDay }
+        let night = NightClock.night(on: ref, in: plan)
         let isOn = night?.isEnabled == true
+        let isSelected = ref == displayedNight
         let bedtimeText = isOn ? (night?.bedtimeMinutes.clockText ?? "–") : "Off"
         let durationText = isOn ? (night?.sleepMinutes ?? 0).durationText : "No bedtime"
         let isUnlocked = isToday || proManager.isPro
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
 
         return Button {
-            if isUnlocked {
-                upcomingSelection = UpcomingSelection(dayOffset: dayOffset)
-            } else {
-                showProSheet = true
-            }
+            select(ref, isUnlocked: isUnlocked, proxy: proxy)
         } label: {
             VStack(alignment: .leading, spacing: 12) {
-                Text(isToday ? "Tonight" : targetDay.shortName)
-                    .font(.system(.caption, design: .rounded, weight: .heavy))
-                    .textCase(.uppercase)
-                    .tracking(1.0)
-                    .foregroundStyle(isToday ? Color.starlightGold : Color.lavendar.opacity(0.85))
+                HStack(spacing: 4) {
+                    Text(isToday ? "Tonight" : ref.weekday.shortName)
+                        .font(.system(.caption, design: .rounded, weight: .heavy))
+                        .textCase(.uppercase)
+                        .tracking(1.0)
+                        .foregroundStyle(isSelected || isToday ? Color.starlightGold : Color.lavendar.opacity(0.85))
+
+                    Spacer(minLength: 0)
+
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color.starlightGold)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(bedtimeText)
@@ -641,10 +740,35 @@ struct TonightView: View {
                         .shadow(color: Color.black.opacity(0.4), radius: 6)
                 }
             }
-            .nightCard(cornerRadius: 24, tint: isToday ? Color.dreamPurple : nil, blurs: false)
+            .nightCard(cornerRadius: 24,
+                       tint: isSelected ? Color.starlightGold : (isToday ? Color.dreamPurple : nil),
+                       blurs: false)
+            .overlay {
+                if isSelected {
+                    shape.strokeBorder(Color.starlightGold, lineWidth: 2)
+                }
+            }
+            .shadow(color: Color.starlightGold.opacity(isSelected ? 0.4 : 0), radius: 16, y: 6)
+            .scaleEffect(isSelected ? 1.05 : 1)
+            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isSelected)
         }
         .buttonStyle(PressScaleButtonStyle())
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(upcomingAccessibilityLabel(ref: ref, isToday: isToday, isOn: isOn, night: night, isUnlocked: isUnlocked))
+        .accessibilityHint(isUnlocked ? "Shows this night on this page" : "Opens Snoozly Pro")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private func upcomingAccessibilityLabel(ref: NightRef,
+                                            isToday: Bool,
+                                            isOn: Bool,
+                                            night: NightPlan?,
+                                            isUnlocked: Bool) -> String {
+        let name = isToday ? "Tonight" : "\(ref.weekday.fullName) night"
+
+        guard isUnlocked else { return "\(name). Locked, requires Snoozly Pro." }
+        guard isOn, let night else { return "\(name). No bedtime." }
+        return "\(name). Bedtime \(night.bedtimeMinutes.clockText), \(night.sleepMinutes.durationText) of sleep."
     }
 }
 

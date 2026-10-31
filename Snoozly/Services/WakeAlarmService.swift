@@ -7,6 +7,7 @@
 
 import ActivityKit
 import AlarmKit
+import AppIntents
 import Foundation
 import SwiftUI
 import os
@@ -36,6 +37,17 @@ enum WakeAlarmService {
         }
     }
 
+    static var isWakeInProgress: Bool {
+        let alarms = (try? AlarmManager.shared.alarms) ?? []
+
+        return alarms.contains { alarm in
+            switch alarm.state {
+            case .alerting, .countdown, .paused: true
+            default: false
+            }
+        }
+    }
+
     static func requestPermission() async -> WakeAlarmPermission {
         do {
             let state = try await AlarmManager.shared.requestAuthorization()
@@ -52,10 +64,11 @@ enum WakeAlarmService {
             _ = await requestPermission()
         }
 
-        let signature = plan.alarmSignature + "|\(permission)"
+        let skipped = TonightSkip.skippedNight(plan: plan)
+        let signature = plan.alarmSignature + "|\(permission)|skip:\(skipped?.key ?? "-")"
         if !force, UserDefaults.standard.string(forKey: signatureKey) == signature { return }
 
-        if await AlarmKitScheduler.apply(plan: plan) {
+        if await AlarmKitScheduler.apply(plan: plan, skipped: skipped) {
             UserDefaults.standard.set(signature, forKey: signatureKey)
         }
     }
@@ -71,7 +84,7 @@ nonisolated private struct AlarmSlot: Hashable {
 }
 
 private enum AlarmKitScheduler {
-    static func apply(plan: SleepPlan) async -> Bool {
+    static func apply(plan: SleepPlan, skipped: NightRef?) async -> Bool {
         cancelAll()
 
         guard AlarmManager.shared.authorizationState != .denied else {
@@ -79,7 +92,7 @@ private enum AlarmKitScheduler {
             return false
         }
 
-        let wanted = plan.sortedNights.filter { $0.isEnabled && $0.alarmEnabled }
+        let wanted = plan.sortedNights.filter { $0.isEnabled && $0.alarmEnabled && $0.weekday != skipped?.weekday }
         let groups = Dictionary(grouping: wanted) { night in
             AlarmSlot(minutes: night.wakeMinutes, snoozeMinutes: plan.effectiveSnoozeMinutes(for: night))
         }
@@ -92,6 +105,20 @@ private enum AlarmKitScheduler {
             if !scheduled { allScheduled = false }
         }
 
+        if let skipped,
+           let night = plan.sortedNights.first(where: { $0.weekday == skipped.weekday }),
+           night.isEnabled, night.alarmEnabled {
+            let nextWake = night.wakeDate(evening: skipped.shifted(byDays: 7).evening)
+
+            if nextWake > .now {
+                let scheduled = await schedule(minutes: night.wakeMinutes,
+                                               weekdays: [],
+                                               snoozeMinutes: plan.effectiveSnoozeMinutes(for: night),
+                                               fixedDate: nextWake)
+                if !scheduled { allScheduled = false }
+            }
+        }
+
         return allScheduled
     }
 
@@ -102,7 +129,7 @@ private enum AlarmKitScheduler {
         }
     }
 
-    private static func schedule(minutes: Int, weekdays: [Locale.Weekday], snoozeMinutes: Int) async -> Bool {
+    private static func schedule(minutes: Int, weekdays: [Locale.Weekday], snoozeMinutes: Int, fixedDate: Date? = nil) async -> Bool {
         let stopButton = AlarmButton(text: "Stop", textColor: .white, systemImageName: "stop.fill")
 
         let presentation: AlarmPresentation
@@ -133,26 +160,33 @@ private enum AlarmKitScheduler {
             tintColor: Color.dreamPurple
         )
 
-        let time = Alarm.Schedule.Relative.Time(hour: minutes / 60, minute: minutes % 60)
-        let schedule = Alarm.Schedule.relative(
-            Alarm.Schedule.Relative(time: time, repeats: .weekly(weekdays))
-        )
+        let schedule: Alarm.Schedule
+
+        if let fixedDate {
+            schedule = .fixed(fixedDate)
+        } else {
+            let time = Alarm.Schedule.Relative.Time(hour: minutes / 60, minute: minutes % 60)
+            schedule = .relative(Alarm.Schedule.Relative(time: time, repeats: .weekly(weekdays)))
+        }
 
         let countdown: Alarm.CountdownDuration? = snoozeMinutes > 0
             ? Alarm.CountdownDuration(preAlert: nil, postAlert: TimeInterval(snoozeMinutes * 60))
             : nil
 
+        let alarmID = UUID()
+        let stopIntent: (any LiveActivityIntent)? = snoozeMinutes > 0 ? StopAlarmIntent(alarmID: alarmID.uuidString) : nil
+
         let configuration = AlarmManager.AlarmConfiguration(
             countdownDuration: countdown,
             schedule: schedule,
             attributes: attributes,
-            stopIntent: nil,
+            stopIntent: stopIntent,
             secondaryIntent: nil,
             sound: .default
         )
 
         do {
-            _ = try await AlarmManager.shared.schedule(id: UUID(), configuration: configuration)
+            _ = try await AlarmManager.shared.schedule(id: alarmID, configuration: configuration)
             return true
         } catch {
             alarmLog.error("Could not schedule alarm for minute \(minutes): \(String(describing: error))")

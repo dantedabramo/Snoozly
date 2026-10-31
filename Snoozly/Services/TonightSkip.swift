@@ -10,20 +10,29 @@ import Foundation
 // MARK: - TonightSkip
 
 enum TonightSkip {
-    static var nightKey: String {
-        let shifted = Calendar.current.date(byAdding: .hour, value: -6, to: .now) ?? .now
-        return shifted.formatted(.iso8601.year().month().day())
+    static func nightKey(plan: SleepPlan?) -> String {
+        NightClock.current(plan: plan).key
     }
 
-    static var isSkipped: Bool {
-        UserDefaults.standard.string(forKey: AppStorageKey.skipDateString) == nightKey
+    static func skippedNight(plan: SleepPlan?) -> NightRef? {
+        let current = NightClock.current(plan: plan)
+        return UserDefaults.standard.string(forKey: AppStorageKey.skipDateString) == current.key ? current : nil
     }
 
-    static func set(_ skipped: Bool) {
-        UserDefaults.standard.set(skipped ? nightKey : "", forKey: AppStorageKey.skipDateString)
+    static func isSkippedEvening(_ evening: Date) -> Bool {
+        let key = NightRef(evening: Calendar.current.startOfDay(for: evening)).key
+        return UserDefaults.standard.string(forKey: AppStorageKey.skipDateString) == key
     }
 
-    static func toggle() {
-        set(!isSkipped)
+    static func isSkipped(plan: SleepPlan?) -> Bool {
+        UserDefaults.standard.string(forKey: AppStorageKey.skipDateString) == nightKey(plan: plan)
+    }
+
+    static func set(_ skipped: Bool, plan: SleepPlan?) {
+        UserDefaults.standard.set(skipped ? nightKey(plan: plan) : "", forKey: AppStorageKey.skipDateString)
+    }
+
+    static func toggle(plan: SleepPlan?) {
+        set(!isSkipped(plan: plan), plan: plan)
     }
 }

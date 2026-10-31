@@ -19,6 +19,7 @@ struct SettingsView: View {
     @AppStorage(AppStorageKey.sleepGoalMinutes) private var sleepGoalMinutes = 480
 
     @State private var proManager = ProManager.shared
+    @State private var photoStore = ProfilePhotoStore.shared
     @State private var showProfileSheet = false
     @State private var showProSheet = false
     @State private var showQuietPicker = false
@@ -35,7 +36,7 @@ struct SettingsView: View {
 
     private var versionText: String {
         let info = Bundle.main.infoDictionary
-        let version = info?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let version = info?["CFBundleShortVersionString"] as? String ?? "1.1"
         let build = info?["CFBundleVersion"] as? String ?? "1"
         return "\(version) (\(build))"
     }
@@ -85,7 +86,7 @@ struct SettingsView: View {
         .sheet(isPresented: $showProfileSheet) {
             SetupProfileSheetView()
         }
-        .sheet(isPresented: $showProSheet) {
+        .fullScreenCover(isPresented: $showProSheet) {
             ProSheetView()
         }
         .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
@@ -136,34 +137,15 @@ struct SettingsView: View {
             showProfileSheet = true
         } label: {
             HStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(colors: [Color.dreamPurple.opacity(0.7), Color.dreamPurple.opacity(0.18)],
-                                           startPoint: .topLeading,
-                                           endPoint: .bottomTrailing)
-                        )
-                        .frame(width: 64, height: 64)
-                        .overlay {
-                            Circle().strokeBorder(
-                                LinearGradient(colors: [Color.white.opacity(0.5), Color.white.opacity(0.08)],
-                                               startPoint: .top,
-                                               endPoint: .bottom),
-                                lineWidth: 1.5
-                            )
-                        }
-                        .shadow(color: Color.dreamPurple.opacity(0.55), radius: 14)
-
-                    Image(systemName: profileIcon.isEmpty ? "moon.stars.fill" : profileIcon)
-                        .font(.system(size: 27, weight: .semibold))
-                        .foregroundStyle(Color.starlightGold)
-                }
+                ProfileAvatar(icon: profileIcon.isEmpty ? "moon.stars.fill" : profileIcon,
+                              photo: photoStore.image,
+                              size: 64)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(profileName.isEmpty ? "Set up Profile" : profileName)
                         .font(.system(.title3, design: .rounded, weight: .heavy))
                         .foregroundStyle(.white)
-                        .lineLimit(1)
+                        .lineLimit(2)
 
                     Text("View or modify Profile")
                         .font(.system(.footnote, design: .rounded))
@@ -176,6 +158,8 @@ struct SettingsView: View {
             }
             .padding(18)
             .nightCard(cornerRadius: 28, tint: Color.dreamPurple)
+            .accessibilityElement(children: .combine)
+            .accessibilityHint("Opens your profile to change your name, icon or photo")
         }
         .buttonStyle(PressScaleButtonStyle())
     }
@@ -276,7 +260,7 @@ struct SettingsView: View {
         .labelsHidden()
         .tint(Color.lavendar)
         .fontWeight(.semibold)
-        .sensoryFeedback(.selection, trigger: selection.wrappedValue)
+        .haptic(.select, trigger: selection.wrappedValue)
     }
 
     // MARK: - Bedtime Routine
@@ -335,6 +319,7 @@ struct SettingsView: View {
                 Toggle("Bedtime Reminders", isOn: reminderBinding)
                     .labelsHidden()
                     .tint(Color.dreamPurple)
+                    .toggleHaptic(remindersAreOn)
             }
 
             RowDivider()

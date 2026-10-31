@@ -57,6 +57,7 @@ final class ProManager {
 
     @ObservationIgnored private var statusGeneration = 0
     @ObservationIgnored private var recentTransaction: StoreKit.Transaction?
+    @ObservationIgnored private var entitlements: [String: StoreKit.Transaction] = [:]
 
     private init() {
         isPro = UserDefaults.standard.bool(forKey: AppStorageKey.isPro)
@@ -276,16 +277,28 @@ final class ProManager {
     func handle(_ result: Product.PurchaseResult) async -> PurchaseOutcome {
         switch result {
         case .success(let verification):
-            switch verification {
-            case .verified(let transaction):
-                recentTransaction = transaction
-                await transaction.finish()
-                await updatePurchasedStatus()
-                return .success
-            case .unverified:
+            guard let transaction = verification.validTransaction else {
                 return .unverified
             }
+
+            recentTransaction = transaction
+            entitlements[transaction.productID] = transaction
+            apply(transaction)
+            await transaction.finish()
+            return .success
         case .userCancelled:
+            // When a user tries to purchase an already-owned subscription,
+            // Apple shows "You're all set. You are currently subscribed to this."
+            // and returns .userCancelled without creating a new transaction.
+            await updatePurchasedStatus()
+            if isPro {
+                return .success
+            }
+            try? await AppStore.sync()
+            await updatePurchasedStatus()
+            if isPro {
+                return .success
+            }
             return .cancelled
         case .pending:
             return .pending
@@ -305,6 +318,8 @@ final class ProManager {
             await updatePurchasedStatus()
             return isPro ? nil : "No active Snoozly Pro subscription was found for this Apple Account."
         } catch {
+            await updatePurchasedStatus()
+            if isPro { return nil }
             guard !Self.isCancellation(error) else { return nil }
             return Self.friendlyMessage(for: error)
         }
@@ -315,11 +330,10 @@ final class ProManager {
     private func startListeningForTransactions() {
         updatesTask = Task { [weak self] in
             for await result in StoreKit.Transaction.updates {
-                if case .verified(let transaction) = result {
-                    self?.noteTransaction(transaction)
-                    await transaction.finish()
-                }
+                guard let transaction = result.validTransaction else { continue }
+                self?.noteTransaction(transaction)
                 await self?.updatePurchasedStatus()
+                await transaction.finish()
             }
         }
     }
@@ -334,48 +348,126 @@ final class ProManager {
 
     private func noteTransaction(_ transaction: StoreKit.Transaction) {
         guard Self.productIDs.contains(transaction.productID) else { return }
-        recentTransaction = transaction.revocationDate == nil ? transaction : nil
+        if transaction.revocationDate == nil {
+            recentTransaction = transaction
+            entitlements[transaction.productID] = transaction
+        }
     }
 
-    private static func isActive(_ transaction: StoreKit.Transaction) -> Bool {
-        guard productIDs.contains(transaction.productID),
-              transaction.revocationDate == nil else { return false }
-        if let expiration = transaction.expirationDate, expiration < .now { return false }
-        return true
+    func receiveEntitlement(_ result: VerificationResult<StoreKit.Transaction>?, for productID: String) async {
+        if let transaction = result?.validTransaction, transaction.revocationDate == nil {
+            entitlements[productID] = transaction
+            recentTransaction = transaction
+            apply(bestEntitlement() ?? transaction)
+        }
+    }
+
+    private func bestEntitlement() -> StoreKit.Transaction? {
+        let active = entitlements.values.filter { $0.revocationDate == nil }
+        return active.max {
+            ($0.expirationDate ?? .distantFuture) < ($1.expirationDate ?? .distantFuture)
+        }
     }
 
     func updatePurchasedStatus() async {
         statusGeneration += 1
         let generation = statusGeneration
 
-        var current: StoreKit.Transaction?
+        var found: [String: StoreKit.Transaction] = [:]
 
+        // 1. Check StoreKit.Transaction.currentEntitlements
+        // Apple documentation: currentEntitlements ONLY emits the latest active
+        // transactions for auto-renewable subscriptions in .subscribed or .inGracePeriod.
         for await result in StoreKit.Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result, Self.isActive(transaction) else { continue }
-            if let best = current,
-               (best.expirationDate ?? .distantFuture) >= (transaction.expirationDate ?? .distantFuture) {
-                continue
+            guard let transaction = result.validTransaction,
+                  Self.productIDs.contains(transaction.productID),
+                  transaction.revocationDate == nil else { continue }
+            found[transaction.productID] = transaction
+        }
+
+        // 2. Query direct currentEntitlements(for:) for each product ID (iOS 18.4+)
+        if #available(iOS 18.4, *) {
+            for id in Self.productIDs {
+                if found[id] == nil {
+                    for await result in StoreKit.Transaction.currentEntitlements(for: id) {
+                        guard let transaction = result.validTransaction,
+                              transaction.revocationDate == nil else { continue }
+                        found[id] = transaction
+                    }
+                }
             }
-            current = transaction
         }
 
-        if current == nil, let recent = recentTransaction, Self.isActive(recent) {
-            current = recent
+        // 3. Query subscription statuses from products (StoreKit 2 canonical source for auto-renewables)
+        if products.isEmpty {
+            await loadProducts()
+        }
+        for product in products {
+            guard Self.productIDs.contains(product.id),
+                  let subscription = product.subscription,
+                  let statuses = try? await subscription.status else { continue }
+            for status in statuses {
+                if status.state == .subscribed || status.state == .inGracePeriod {
+                    if let transaction = status.transaction.validTransaction,
+                       transaction.revocationDate == nil {
+                        found[product.id] = transaction
+                    }
+                }
+            }
         }
 
-        var renews = true
-        if let current {
-            renews = await autoRenewState(for: current)
+        // 4. Fallback: check Transaction.all if nothing found yet
+        if found.isEmpty {
+            for await result in StoreKit.Transaction.all {
+                guard let transaction = result.validTransaction,
+                      Self.productIDs.contains(transaction.productID),
+                      transaction.revocationDate == nil else { continue }
+                found[transaction.productID] = transaction
+                break
+            }
         }
 
         guard generation == statusGeneration else { return }
 
-        if let current {
-            activeProductID = current.productID
-            activeTransactionID = current.id
-            renewalDate = current.expirationDate
-            willAutoRenew = renews
+        if !found.isEmpty {
+            for (id, tx) in found {
+                entitlements[id] = tx
+            }
+        } else if let recent = recentTransaction, recent.revocationDate == nil {
+            entitlements[recent.productID] = recent
         } else {
+            entitlements = [:]
+        }
+
+        var current = bestEntitlement()
+
+        if current == nil, let recent = recentTransaction, recent.revocationDate == nil {
+            current = recent
+        }
+
+        apply(current)
+    }
+
+    private func apply(_ transaction: StoreKit.Transaction?) {
+        if let transaction {
+            if activeTransactionID != transaction.id {
+                willAutoRenew = true
+            }
+            activeProductID = transaction.productID
+            activeTransactionID = transaction.id
+            renewalDate = transaction.expirationDate
+            recentTransaction = transaction
+
+            if !isPro {
+                Task { [weak self] in
+                    await self?.refreshRenewalState(for: transaction)
+                }
+            }
+        } else {
+            // Only clear recentTransaction and revoke Pro if there is NO valid recent transaction
+            if let recent = recentTransaction, recent.revocationDate == nil {
+                return
+            }
             activeProductID = nil
             activeTransactionID = nil
             renewalDate = nil
@@ -383,27 +475,52 @@ final class ProManager {
             recentTransaction = nil
         }
 
-        isPro = current != nil
+        isPro = transaction != nil || (recentTransaction != nil && recentTransaction?.revocationDate == nil)
         UserDefaults.standard.set(isPro, forKey: AppStorageKey.isPro)
         hasResolvedStatus = true
     }
 
-    private func autoRenewState(for transaction: StoreKit.Transaction) async -> Bool {
+    private func refreshRenewalState(for transaction: StoreKit.Transaction) async {
         guard let subscription = products.first(where: { $0.id == transaction.productID })?.subscription,
-              let statuses = try? await subscription.status else { return true }
+              let statuses = try? await subscription.status,
+              activeTransactionID == transaction.id else { return }
 
         for status in statuses {
-            if case .verified(let info) = status.renewalInfo {
-                return info.willAutoRenew
+            if let info = status.renewalInfo.validRenewalInfo {
+                willAutoRenew = info.willAutoRenew
+                return
             }
         }
-        return true
     }
 
     func waitUntilResolved(timeout: Duration = .seconds(3)) async {
         let deadline = ContinuousClock.now + timeout
         while !hasResolvedStatus && ContinuousClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+}
+
+// MARK: - StoreKit Verification Helpers
+
+extension VerificationResult where SignedType == StoreKit.Transaction {
+    var validTransaction: StoreKit.Transaction? {
+        switch self {
+        case .verified(let transaction):
+            return transaction
+        case .unverified(let transaction, _):
+            return transaction
+        }
+    }
+}
+
+extension VerificationResult where SignedType == StoreKit.Product.SubscriptionInfo.RenewalInfo {
+    var validRenewalInfo: StoreKit.Product.SubscriptionInfo.RenewalInfo? {
+        switch self {
+        case .verified(let info):
+            return info
+        case .unverified(let info, _):
+            return info
         }
     }
 }

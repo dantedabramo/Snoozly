@@ -411,7 +411,7 @@ private struct WindDownOptionPicker: View {
         .overlay {
             Capsule().strokeBorder(Color.white.opacity(0.07), lineWidth: 1)
         }
-        .sensoryFeedback(.selection, trigger: selection)
+        .haptic(.select, trigger: selection)
         .accessibilityLabel("Wind-down length")
     }
 }

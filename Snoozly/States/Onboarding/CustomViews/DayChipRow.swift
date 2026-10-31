@@ -24,7 +24,7 @@ struct DayChipRow<Item: Identifiable>: View {
                 chip(for: item)
             }
         }
-        .sensoryFeedback(.selection, trigger: selection)
+        .haptic(.tab, trigger: selection)
     }
 
     private func chip(for item: Item) -> some View {

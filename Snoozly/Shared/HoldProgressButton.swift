@@ -57,7 +57,7 @@ struct HoldProgressButton: View {
                         Spacer()
 
                         Text(isHolding ? "\(Int(progress * 100))%" : "Hold")
-                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .scaledFont(size: 11, weight: .heavy, design: .rounded)
                             .foregroundStyle(Color.lavendar.opacity(0.8))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)

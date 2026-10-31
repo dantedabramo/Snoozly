@@ -121,9 +121,10 @@ extension SleepPlan {
 
     var quietSignature: String {
         let nights = sortedNights.map { night in
-            "\(night.weekdayIndex):\(night.isEnabled && night.quietAppsEnabled ? "\(night.bedtimeMinutes)-\(night.wakeMinutes)" : "off")"
+            let flags = (night.alarmEnabled ? "a" : "") + (night.snoozeEnabled ? "s" : "")
+            return "\(night.weekdayIndex):\(night.isEnabled && night.quietAppsEnabled ? "\(night.bedtimeMinutes)-\(night.wakeMinutes)\(flags)" : "off")"
         }
-        return (["\(blocksAppsDuringWindDown)", "\(windDownMinutes)"] + nights).joined(separator: "|")
+        return (["\(blocksAppsDuringWindDown)", "\(windDownMinutes)", "snooze\(snoozeMinutes)"] + nights).joined(separator: "|")
     }
 
     var notificationSignature: [Int] {

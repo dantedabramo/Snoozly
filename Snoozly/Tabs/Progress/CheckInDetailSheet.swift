@@ -113,7 +113,7 @@ struct CheckInDetailSheet: View {
                     .rotationEffect(.degrees(-90))
 
                 Text("\(checkIn.score)")
-                    .font(.system(size: 28, weight: .heavy, design: .rounded))
+                    .scaledFont(size: 28, weight: .heavy, design: .rounded)
                     .foregroundStyle(.white)
             }
             .frame(width: 84, height: 84)

@@ -16,6 +16,7 @@ struct HoldActionButton: View {
     var duration: Double = 0.8
     var isDestructive: Bool = false
     var isHighlighted: Bool = false
+    var playsCompletionHaptic: Bool = true
     let onComplete: () -> Void
 
     @State private var progress: CGFloat = 0
@@ -66,7 +67,7 @@ struct HoldActionButton: View {
                 Spacer(minLength: 8)
 
                 Text(hintText)
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .scaledFont(size: 11, weight: .heavy, design: .rounded)
                     .foregroundStyle(Color.lavendar.opacity(0.9))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
@@ -100,7 +101,10 @@ struct HoldActionButton: View {
             guard newValue > oldValue else { return nil }
             return .impact(weight: .light, intensity: 0.35 + 0.15 * Double(newValue))
         }
-        .sensoryFeedback(isDestructive ? .warning : .success, trigger: completions)
+        .sensoryFeedback(trigger: completions) { _, _ in
+            guard playsCompletionHaptic else { return nil }
+            return isDestructive ? .warning : .success
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
         .accessibilityHint("Press and hold to confirm")

@@ -275,12 +275,14 @@ struct InfoChip: View {
         HStack(spacing: 5) {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .bold))
+                .accessibilityHidden(true)
 
             Text(text)
                 .font(.system(.caption, design: .rounded, weight: .bold))
-                .lineLimit(1)
+                .lineLimit(2)
                 .minimumScaleFactor(0.8)
         }
+        .accessibilityElement(children: .combine)
         .foregroundStyle(tint)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)

@@ -41,10 +41,6 @@ struct ProSheetView: View {
         selectedPlan == .yearly && proManager.yearlyTrialText != nil
     }
 
-    private var sheetDetents: Set<PresentationDetent> {
-        proManager.isPro ? [.fraction(0.7)] : [.large]
-    }
-
     var body: some View {
         ZStack(alignment: .topTrailing) {
             NightBackground(mood: .calm)
@@ -78,11 +74,11 @@ struct ProSheetView: View {
             if proManager.products.isEmpty {
                 await proManager.loadProducts()
             }
+            await proManager.updatePurchasedStatus()
         }
-        .presentationDetents(sheetDetents)
-        .presentationDragIndicator(.visible)
         .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
-        .sensoryFeedback(.success, trigger: proManager.isPro) { old, new in !old && new }
+        .haptic(.celebrate, trigger: proManager.isPro) { old, new in !old && new }
+        .presentationHaptic()
         .interactiveDismissDisabled(isPurchasing)
     }
 
@@ -95,12 +91,13 @@ struct ProSheetView: View {
             Image(systemName: "xmark")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Color.lavendar)
-                .frame(width: 36, height: 36)
-                .nightCard(cornerRadius: 18, blurs: false)
+                .frame(width: 44, height: 44)
+                .nightCard(cornerRadius: 22, blurs: false)
                 .contentShape(Circle())
         }
         .buttonStyle(PressScaleButtonStyle())
         .accessibilityLabel("Close")
+        .accessibilityHint("Closes Snoozly Pro")
         .padding(.top, 14)
         .padding(.trailing, 16)
     }
@@ -121,7 +118,7 @@ struct ProSheetView: View {
             VStack(spacing: 6) {
                 HStack(spacing: 8) {
                     Text(proManager.isPro ? "You're on Snoozly" : "Sleep better with Snoozly")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .scaledFont(size: 24, weight: .bold, design: .rounded)
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -143,7 +140,7 @@ struct ProSheetView: View {
 
     private var proBadge: some View {
         Text("PRO")
-            .font(.system(size: 12, weight: .black, design: .rounded))
+            .scaledFont(size: 12, weight: .black, design: .rounded)
             .foregroundStyle(Color.midnightNavy)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -172,7 +169,7 @@ struct ProSheetView: View {
             featureRow(
                 icon: "sparkles",
                 title: "What shapes your sleep",
-                subtitle: "Find out which habits raise or lower your score."
+                subtitle: "See your most common habits and what to work on."
             )
         }
         .padding(14)
@@ -269,7 +266,7 @@ struct ProSheetView: View {
 
             if let diagnostics = proManager.loadDiagnostics {
                 Text(diagnostics)
-                    .font(.system(size: 11, design: .monospaced))
+                    .scaledFont(size: 11, design: .monospaced)
                     .foregroundStyle(Color.starlightGold.opacity(0.8))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -331,7 +328,7 @@ struct ProSheetView: View {
 
                         if let badge {
                             Text(badge)
-                                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                                .scaledFont(size: 10, weight: .heavy, design: .rounded)
                                 .foregroundStyle(Color.midnightNavy)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
@@ -369,7 +366,7 @@ struct ProSheetView: View {
             .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
         .buttonStyle(PressScaleButtonStyle())
-        .sensoryFeedback(.selection, trigger: selectedPlan)
+        .haptic(.select, trigger: selectedPlan)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -574,16 +571,33 @@ struct ProSheetView: View {
                     dismiss()
                     return
                 case .pending:
+                    Haptics.play(.warning)
                     notice = "Your purchase is waiting for approval. Snoozly Pro unlocks as soon as it's approved."
                 case .unverified:
+                    Haptics.play(.error)
                     notice = "We couldn't verify that purchase. Please try again or restore purchases."
                 case .failed:
+                    Haptics.play(.error)
                     notice = "That purchase didn't go through. Please try again."
                 case .cancelled:
-                    break
+                    if proManager.isPro {
+                        isPurchasing = false
+                        dismiss()
+                        return
+                    }
+                    Haptics.play(.tap)
                 }
             } catch {
+                await proManager.updatePurchasedStatus()
+                if proManager.isPro {
+                    isPurchasing = false
+                    dismiss()
+                    return
+                }
                 notice = ProManager.purchaseMessage(for: error)
+                if notice != nil {
+                    Haptics.play(.error)
+                }
             }
 
             isPurchasing = false

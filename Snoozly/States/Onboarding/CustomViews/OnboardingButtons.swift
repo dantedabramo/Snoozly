@@ -38,7 +38,7 @@ struct OnboardingForwardButton: View {
         }
         .buttonStyle(ProminentCapsuleButtonStyle())
         .disabled(!isEnabled)
-        .sensoryFeedback(.impact(flexibility: .soft), trigger: taps)
+        .haptic(.confirm, trigger: taps)
     }
 }
 
@@ -128,7 +128,7 @@ struct OnboardingBackButton: View {
                 .contentShape(Circle())
         }
         .buttonStyle(PressScaleButtonStyle())
-        .sensoryFeedback(.selection, trigger: taps)
+        .haptic(.tap, trigger: taps)
         .accessibilityLabel("Back")
     }
 }
@@ -138,6 +138,7 @@ struct PressScaleButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.92 : 1)
             .animation(.spring(response: 0.3, dampingFraction: 0.65), value: configuration.isPressed)
+            .haptic(.press, trigger: configuration.isPressed) { _, pressed in pressed }
     }
 }
 

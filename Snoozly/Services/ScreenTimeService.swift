@@ -14,6 +14,8 @@ import os
 enum ScreenTimeService {
     static let activityPrefix = "snoozly.quiet."
     private static let signatureKey = "quietHoursSignature"
+    private static let releaseKey = "quietHoldReleasedAt"
+    static let snoozeHoldMinutes = 30
     private static let log = Logger(subsystem: "com.dantedabramo.Snoozly", category: "ScreenTime")
 
     // MARK: - Authorization
@@ -25,11 +27,13 @@ enum ScreenTimeService {
     }
 
     static var status: PermissionStatus {
-        switch AuthorizationCenter.shared.authorizationStatus {
-        case .approved: .granted
-        case .denied: .denied
-        case .notDetermined: .notDetermined
-        @unknown default: .notDetermined
+        let current = AuthorizationCenter.shared.authorizationStatus
+
+        switch current {
+        case .approved: return .granted
+        case .denied: return .denied
+        case .notDetermined: return .notDetermined
+        default: return String(describing: current).hasPrefix("approved") ? .granted : .notDetermined
         }
     }
 
@@ -135,11 +139,12 @@ enum ScreenTimeService {
 
         saveSelection(selection)
 
-        let signature = plan.quietSignature
+        let skipped = TonightSkip.skippedNight(plan: plan)
+        let signature = plan.quietSignature + "|hold:\(WakeAlarmService.permission == .authorized)|skip:\(skipped?.key ?? "-")"
         let changed = force || savedSignature != signature
 
         if changed {
-            restartMonitoring(for: plan, signature: signature)
+            restartMonitoring(for: plan, signature: signature, skipped: skipped)
         }
 
         if isInQuietWindow(plan: plan) {
@@ -155,14 +160,21 @@ enum ScreenTimeService {
         UserDefaults.standard.set("off", forKey: signatureKey)
     }
 
-    private static func restartMonitoring(for plan: SleepPlan, signature: String) {
+    private static func restartMonitoring(for plan: SleepPlan, signature: String, skipped: NightRef?) {
         let center = DeviceActivityCenter()
         center.stopMonitoring()
 
         var failed = false
 
-        for night in plan.sortedNights where night.isEnabled {
-            let window = quietWindow(for: night, windDownMinutes: plan.windDownMinutes)
+        for night in plan.sortedNights where night.isEnabled && night.quietAppsEnabled {
+            if let skipped, skipped.weekday == night.weekday {
+                if !scheduleOneTime(for: night, plan: plan, evening: skipped.shifted(byDays: 7).evening, center: center) {
+                    failed = true
+                }
+                continue
+            }
+
+            let window = quietWindow(for: night, plan: plan)
             let schedule = DeviceActivitySchedule(
                 intervalStart: window.start,
                 intervalEnd: window.end,
@@ -183,6 +195,35 @@ enum ScreenTimeService {
         }
     }
 
+    private static func scheduleOneTime(for night: NightPlan,
+                                        plan: SleepPlan,
+                                        evening: Date,
+                                        center: DeviceActivityCenter) -> Bool {
+        let calendar = Calendar.current
+        let start = night.windDownDate(evening: evening, windDownMinutes: plan.windDownMinutes)
+        let end = calendar.date(byAdding: .minute,
+                                value: holdMinutes(for: night, plan: plan),
+                                to: night.wakeDate(evening: evening)) ?? night.wakeDate(evening: evening)
+
+        guard start > .now else { return true }
+
+        let parts: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute]
+        let schedule = DeviceActivitySchedule(
+            intervalStart: calendar.dateComponents(parts, from: start),
+            intervalEnd: calendar.dateComponents(parts, from: end),
+            repeats: false
+        )
+        let name = DeviceActivityName(activityPrefix + "once." + String(night.weekdayIndex))
+
+        do {
+            try center.startMonitoring(name, during: schedule)
+            return true
+        } catch {
+            log.error("Could not monitor \(name.rawValue): \(error.localizedDescription)")
+            return false
+        }
+    }
+
     // MARK: - Shield
 
     private static func applyShield(_ selection: FamilyActivitySelection) {
@@ -200,48 +241,110 @@ enum ScreenTimeService {
         }
     }
 
+    // MARK: - Snooze Hold
+
+    private static func holdMinutes(for night: NightPlan, plan: SleepPlan) -> Int {
+        guard WakeAlarmService.permission == .authorized,
+              night.alarmEnabled,
+              plan.effectiveSnoozeMinutes(for: night) > 0 else { return 0 }
+        return snoozeHoldMinutes
+    }
+
+    static func releaseWakeHold() {
+        UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: releaseKey)
+        guard isAuthorized else { return }
+        ManagedSettingsStore().clearAllSettings()
+    }
+
+    static func settleWakeHold(for plan: SleepPlan, now: Date = .now) {
+        guard isAuthorized, plan.blocksAppsDuringWindDown else { return }
+        guard isInHoldTail(plan: plan, now: now), !WakeAlarmService.isWakeInProgress else { return }
+        releaseWakeHold()
+    }
+
+    private static func isHoldReleased(since baseEnd: Date) -> Bool {
+        UserDefaults.standard.double(forKey: releaseKey) >= baseEnd.timeIntervalSince1970
+    }
+
     // MARK: - Windows
 
-    private static func isInQuietWindow(plan: SleepPlan, now: Date = .now) -> Bool {
+    private struct Occurrence {
+        let baseEnd: Date
+        let end: Date
+
+        var isSkipped: Bool {
+            let day = Calendar.current.startOfDay(for: baseEnd)
+            let evening = Calendar.current.date(byAdding: .day, value: -1, to: day) ?? day
+            return TonightSkip.isSkippedEvening(evening)
+        }
+    }
+
+    private static func occurrence(for night: NightPlan, plan: SleepPlan, now: Date) -> Occurrence? {
         let calendar = Calendar.current
+        let window = quietWindow(for: night, plan: plan)
 
-        for night in plan.sortedNights where night.isEnabled {
-            let window = quietWindow(for: night, windDownMinutes: plan.windDownMinutes)
+        guard let start = calendar.nextDate(after: now,
+                                            matching: window.start,
+                                            matchingPolicy: .nextTime,
+                                            direction: .backward),
+              let baseEnd = calendar.nextDate(after: start,
+                                              matching: window.baseEnd,
+                                              matchingPolicy: .nextTime),
+              let end = calendar.nextDate(after: start,
+                                          matching: window.end,
+                                          matchingPolicy: .nextTime) else {
+            return nil
+        }
 
-            guard let start = calendar.nextDate(after: now,
-                                                matching: window.start,
-                                                matchingPolicy: .nextTime,
-                                                direction: .backward),
-                  let end = calendar.nextDate(after: start,
-                                              matching: window.end,
-                                              matchingPolicy: .nextTime) else {
-                continue
-            }
+        return Occurrence(baseEnd: baseEnd, end: end)
+    }
 
-            if now < end { return true }
+    private static func isInQuietWindow(plan: SleepPlan, now: Date = .now) -> Bool {
+        for night in plan.sortedNights where night.isEnabled && night.quietAppsEnabled {
+            guard let found = occurrence(for: night, plan: plan, now: now), !found.isSkipped else { continue }
+
+            if now < found.baseEnd { return true }
+            if now < found.end && !isHoldReleased(since: found.baseEnd) { return true }
+        }
+
+        return false
+    }
+
+    private static func isInHoldTail(plan: SleepPlan, now: Date) -> Bool {
+        for night in plan.sortedNights where night.isEnabled && night.quietAppsEnabled {
+            guard let found = occurrence(for: night, plan: plan, now: now), !found.isSkipped else { continue }
+            if now >= found.baseEnd && now < found.end { return true }
         }
 
         return false
     }
 
     private static func quietWindow(for night: NightPlan,
-                                    windDownMinutes: Int) -> (start: DateComponents, end: DateComponents) {
+                                    plan: SleepPlan) -> (start: DateComponents, baseEnd: DateComponents, end: DateComponents) {
+        let minutesPerDay = 24 * 60
         let bedtimeDay = night.weekday.shifted(by: night.bedtimeMinutes < 6 * 60 ? 1 : 0)
 
-        let startMinutes = night.bedtimeMinutes - windDownMinutes
+        let startMinutes = night.bedtimeMinutes - plan.windDownMinutes
         let startShift = startMinutes < 0 ? -1 : 0
-        let startWrapped = ((startMinutes % (24 * 60)) + 24 * 60) % (24 * 60)
+        let startWrapped = ((startMinutes % minutesPerDay) + minutesPerDay) % minutesPerDay
 
         var start = DateComponents()
         start.weekday = bedtimeDay.shifted(by: startShift).calendarWeekday
         start.hour = startWrapped / 60
         start.minute = startWrapped % 60
 
-        var end = DateComponents()
-        end.weekday = night.weekday.shifted(by: 1).calendarWeekday
-        end.hour = night.wakeMinutes / 60
-        end.minute = night.wakeMinutes % 60
+        var baseEnd = DateComponents()
+        baseEnd.weekday = night.weekday.shifted(by: 1).calendarWeekday
+        baseEnd.hour = night.wakeMinutes / 60
+        baseEnd.minute = night.wakeMinutes % 60
 
-        return (start, end)
+        let totalEnd = night.wakeMinutes + holdMinutes(for: night, plan: plan)
+
+        var end = DateComponents()
+        end.weekday = night.weekday.shifted(by: 1 + totalEnd / minutesPerDay).calendarWeekday
+        end.hour = (totalEnd % minutesPerDay) / 60
+        end.minute = totalEnd % 60
+
+        return (start, baseEnd, end)
     }
 }

@@ -100,7 +100,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             return
         }
 
-        let requests = makeRequests(for: plan)
+        let requests = makeRequests(for: plan, skipped: TonightSkip.skippedNight(plan: plan))
         let kept = Set(requests.map(\.identifier))
         center.removePendingNotificationRequests(
             withIdentifiers: NotificationManager.allIdentifiers.filter { !kept.contains($0) }
@@ -115,11 +115,33 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    private func makeRequests(for plan: SleepPlan) -> [UNNotificationRequest] {
+    private func makeRequests(for plan: SleepPlan, skipped: NightRef?) -> [UNNotificationRequest] {
         var requests: [UNNotificationRequest] = []
 
         for night in plan.sortedNights where night.isEnabled && night.remindersEnabled {
             let bedtimeText = night.bedtimeMinutes.clockText
+
+            if let skipped, skipped.weekday == night.weekday {
+                let next = skipped.shifted(byDays: 7).evening
+
+                requests.append(makeOneTimeRequest(
+                    .windDown,
+                    day: night.weekday,
+                    date: night.windDownDate(evening: next, windDownMinutes: plan.windDownMinutes),
+                    title: String(localized: "Time to wind down"),
+                    body: String(localized: "Bedtime is at \(bedtimeText). Let's slow things down.")
+                ))
+
+                requests.append(makeOneTimeRequest(
+                    .bedtime,
+                    day: night.weekday,
+                    date: night.bedtimeDate(evening: next),
+                    title: String(localized: "Bedtime"),
+                    body: String(localized: "Sweet dreams. It's time to head to bed.")
+                ))
+
+                continue
+            }
 
             requests.append(makeRequest(
                 .windDown,
@@ -139,6 +161,25 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
 
         return requests
+    }
+
+    private func makeOneTimeRequest(_ kind: Kind,
+                                    day: Weekday,
+                                    date: Date,
+                                    title: String,
+                                    body: String) -> UNNotificationRequest {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+
+        let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+
+        return UNNotificationRequest(
+            identifier: NotificationManager.identifier(kind, day),
+            content: content,
+            trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
+        )
     }
 
     private func makeRequest(_ kind: Kind,

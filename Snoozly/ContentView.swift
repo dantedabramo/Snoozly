@@ -12,8 +12,15 @@ import StoreKit
 // MARK: - ContentSheet
 
 private enum ContentSheet: String, Identifiable {
-    case pro
     case checkIn
+
+    var id: String { rawValue }
+}
+
+// MARK: - ContentCover
+
+private enum ContentCover: String, Identifiable {
+    case pro
 
     var id: String { rawValue }
 }
@@ -28,24 +35,34 @@ struct ContentView: View {
     @Environment(\.requestReview) private var requestReview
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppStorageKey.skipDateString) private var skipDateString = ""
+    @AppStorage(AppStorageKey.lastCheckInPromptDay) private var lastCheckInPromptDay = ""
     @State private var proManager = ProManager.shared
     @State private var permissions = PermissionCenter.shared
     @State private var router = QuickActionRouter.shared
     @State private var selectedTab: Int = 0
     @State private var scheduleWeekday: Weekday = .today
     @State private var activeSheet: ContentSheet?
+    @State private var activeCover: ContentCover?
     @State private var hasHandledLaunch = false
 
-    private var reminderKey: [Int] {
-        (plans.first?.notificationSignature ?? []) + [scenePhase == .active ? 1 : 0]
+    private var skipTag: String {
+        isTonightSkipped ? skipDateString : "-"
+    }
+
+    private var reminderKey: String {
+        "\((plans.first?.notificationSignature ?? []) + [scenePhase == .active ? 1 : 0])|\(skipTag)"
     }
 
     private var quietKey: String {
-        (plans.first?.quietSignature ?? "") + (scenePhase == .active ? "|active" : "|inactive")
+        (plans.first?.quietSignature ?? "") + (scenePhase == .active ? "|active" : "|inactive") + "|\(permissions.alarms)|\(skipTag)"
     }
 
     private var isTonightSkipped: Bool {
-        skipDateString == TonightSkip.nightKey
+        skipDateString == TonightSkip.nightKey(plan: plans.first)
+    }
+
+    private var hasCheckInToday: Bool {
+        checkIns.contains { Calendar.current.isDateInToday($0.date) }
     }
 
     var body: some View {
@@ -73,17 +90,30 @@ struct ContentView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .tabBarMinimizeBehavior(.onScrollDown)
-        .sheet(item: $activeSheet, onDismiss: runPendingQuickAction) { sheet in
-            switch sheet {
+        .task {
+            await ProManager.shared.updatePurchasedStatus()
+        }
+        .haptic(.tab, trigger: selectedTab)
+        .fullScreenCover(item: $activeCover, onDismiss: continueAfterPro) { cover in
+            switch cover {
             case .pro:
                 ProSheetView()
+            }
+        }
+        .sheet(item: $activeSheet, onDismiss: runPendingQuickAction) { sheet in
+            switch sheet {
             case .checkIn:
                 CheckInSheetView()
             }
         }
         .onChange(of: router.pending) { _, newValue in
-            if newValue != nil && activeSheet == nil && hasHandledLaunch {
+            if newValue != nil && activeSheet == nil && activeCover == nil && hasHandledLaunch {
                 runPendingQuickAction()
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                presentCheckInIfDue()
             }
         }
         .onChange(of: checkIns.count) { oldValue, newValue in
@@ -94,12 +124,16 @@ struct ContentView: View {
         .task(id: isReady) {
             await handleLaunch()
         }
-        .task(id: skipDateString) {
+        .task(id: "\(skipDateString)|\(scenePhase == .active)") {
+            guard scenePhase == .active else { return }
             router.refreshShortcutItems(isSkipped: isTonightSkipped)
         }
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
             await permissions.refresh()
+            if let plan = plans.first {
+                ScreenTimeService.settleWakeHold(for: plan)
+            }
         }
         .task(id: reminderKey) {
             guard scenePhase == .active, let plan = plans.first else { return }
@@ -109,7 +143,7 @@ struct ContentView: View {
             guard scenePhase == .active, let plan = plans.first else { return }
             ScreenTimeService.reschedule(for: plan)
         }
-        .task(id: plans.first?.alarmSignature) {
+        .task(id: "\(plans.first?.alarmSignature ?? "")|\(skipTag)|\(scenePhase == .active)") {
             guard let plan = plans.first else { return }
             plan.normalizeSnooze()
             await WakeAlarmService.reschedule(for: plan)
@@ -134,9 +168,37 @@ struct ContentView: View {
         try? await Task.sleep(for: .milliseconds(450))
 
         if proManager.isPro {
+            continueAfterPro()
+        } else {
+            activeCover = .pro
+        }
+    }
+
+    private func continueAfterPro() {
+        if router.pending != nil {
             runPendingQuickAction()
         } else {
-            activeSheet = .pro
+            presentCheckInIfDue()
+        }
+    }
+
+    // MARK: - Morning Check-In
+
+    private func presentCheckInIfDue() {
+        guard hasHandledLaunch, activeCover == nil, activeSheet == nil, router.pending == nil else { return }
+
+        let isDue = CheckInSchedule.isDue(
+            plan: plans.first,
+            hasCheckInToday: hasCheckInToday,
+            lastPromptDay: lastCheckInPromptDay
+        )
+        guard isDue else { return }
+
+        Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            guard activeCover == nil, activeSheet == nil else { return }
+            lastCheckInPromptDay = CheckInSchedule.dayKey()
+            activeSheet = .checkIn
         }
     }
 
@@ -148,7 +210,7 @@ struct ContentView: View {
 
         Task {
             try? await Task.sleep(for: .seconds(2))
-            guard activeSheet == nil else { return }
+            guard activeSheet == nil, activeCover == nil else { return }
             ReviewPrompter.markPrompted()
             requestReview()
         }
@@ -168,7 +230,9 @@ struct ContentView: View {
             }
         case .skipTonight:
             selectedTab = 0
-            TonightSkip.toggle()
+            let wasSkipped = isTonightSkipped
+            TonightSkip.toggle(plan: plans.first)
+            Haptics.play(wasSkipped ? .resume : .skip)
         case .schedule:
             scheduleWeekday = .today
             selectedTab = 1

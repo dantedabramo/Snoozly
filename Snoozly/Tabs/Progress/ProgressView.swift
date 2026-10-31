@@ -14,7 +14,6 @@ import Charts
 struct ProgressView: View {
     @Query(sort: \SleepCheckIn.date, order: .reverse) private var checkIns: [SleepCheckIn]
     @Environment(\.modelContext) private var modelContext
-    @AppStorage(AppStorageKey.sleepGoalMinutes) private var sleepGoalMinutes = 480
     @State private var proManager = ProManager.shared
     @State private var selectedRange: TimeRange = .sevenDays
     @State private var showCheckInSheet = false
@@ -75,9 +74,8 @@ struct ProgressView: View {
         let hours: Double
     }
 
-    struct FactorImpact: Identifiable {
+    struct FactorInsight: Identifiable {
         let factor: SleepFactor
-        let delta: Int
         let count: Int
 
         var id: String { factor.id }
@@ -140,17 +138,6 @@ struct ProgressView: View {
         }
     }
 
-    private var consistencyText: String {
-        let current = points
-        guard current.count >= 3 else { return "–" }
-        let mean = current.reduce(0) { $0 + $1.hours } / Double(current.count)
-        let variance = current.reduce(0) { $0 + ($1.hours - mean) * ($1.hours - mean) } / Double(current.count)
-        let deviation = variance.squareRoot()
-        if deviation <= 0.75 { return "Steady" }
-        if deviation <= 1.5 { return "Variable" }
-        return "Irregular"
-    }
-
     private var streak: Int {
         let days = Set(checkIns.map { calendar.startOfDay(for: $0.date) })
         var cursor = calendar.startOfDay(for: .now)
@@ -166,33 +153,28 @@ struct ProgressView: View {
         return count
     }
 
-    private var factorImpacts: [FactorImpact] {
+    private var commonFactors: [FactorInsight] {
         let recent = Array(checkIns.prefix(60))
-        guard recent.count >= 6 else { return [] }
+        guard !recent.isEmpty else { return [] }
 
-        var results: [FactorImpact] = []
-        for factor in SleepFactor.allCases {
-            let with = recent.filter { $0.factors.contains(factor) }
-            let without = recent.filter { !$0.factors.contains(factor) }
-            guard with.count >= 2, without.count >= 2 else { continue }
-
-            let withAverage = Double(with.reduce(0) { $0 + $1.score }) / Double(with.count)
-            let withoutAverage = Double(without.reduce(0) { $0 + $1.score }) / Double(without.count)
-            let delta = Int((withAverage - withoutAverage).rounded())
-            guard delta != 0 else { continue }
-
-            results.append(FactorImpact(factor: factor, delta: delta, count: with.count))
+        var counts: [SleepFactor: Int] = [:]
+        for checkIn in recent {
+            for factor in checkIn.factors {
+                counts[factor, default: 0] += 1
+            }
         }
 
-        return Array(results.sorted { abs($0.delta) > abs($1.delta) }.prefix(3))
-    }
+        let insights = counts.compactMap { factor, count -> FactorInsight? in
+            guard count > 0 else { return nil }
+            return FactorInsight(factor: factor, count: count)
+        }
 
-    private var goalScore: Int {
-        80
-    }
-
-    private var goalHoursText: String {
-        "\(sleepGoalMinutes.durationText) sleep goal"
+        return Array(insights.sorted { a, b in
+            if a.factor.isDisruptor != b.factor.isDisruptor {
+                return a.factor.isDisruptor && !b.factor.isDisruptor
+            }
+            return a.count > b.count
+        }.prefix(4))
     }
 
     private var selectedPoint: SleepPoint? {
@@ -221,7 +203,7 @@ struct ProgressView: View {
                     headerSection
                         .reveal(appeared, delay: 0)
 
-                    averageScoreGoalCard
+                    averageScoreCard
                         .reveal(appeared, delay: 0.06)
 
                     interactiveChartCard
@@ -247,7 +229,7 @@ struct ProgressView: View {
         .sheet(isPresented: $showCheckInSheet) {
             CheckInSheetView()
         }
-        .sheet(isPresented: $showProSheet) {
+        .fullScreenCover(isPresented: $showProSheet) {
             ProSheetView()
         }
         .sheet(item: $selectedDetailCheckIn) { checkIn in
@@ -273,32 +255,9 @@ struct ProgressView: View {
         }
     }
 
-    // MARK: - Average Score & Goal Card
+    // MARK: - Average Score Card
 
-    private var goalDeltaChip: some View {
-        let gap = (averageScore ?? goalScore) - goalScore
-        let text: String
-        let tint: Color
-        let icon: String
-
-        if gap == 0 {
-            text = "Right on your goal"
-            tint = Color.restfulMint
-            icon = "equal.circle.fill"
-        } else if gap > 0 {
-            text = "\(gap) pts above goal"
-            tint = Color.restfulMint
-            icon = "arrow.up.right.circle.fill"
-        } else {
-            text = "\(-gap) pts below goal"
-            tint = Color.starlightGold
-            icon = "arrow.down.right.circle.fill"
-        }
-
-        return InfoChip(icon: icon, text: text, tint: tint)
-    }
-
-    private var averageScoreGoalCard: some View {
+    private var averageScoreCard: some View {
         VStack(spacing: 16) {
             HStack(spacing: 18) {
                 ScoreRing(score: averageScore, lineWidth: 9, numberSize: 32)
@@ -321,38 +280,15 @@ struct ProgressView: View {
                         .foregroundStyle(Color.starlightGold)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
-
-                    if averageScore != nil {
-                        goalDeltaChip
-                            .padding(.top, 2)
-                    }
                 }
 
                 Spacer(minLength: 0)
             }
 
-            Divider()
-                .overlay(Color.white.opacity(0.08))
-
-            HStack(spacing: 10) {
-                RowIcon(systemName: "target", size: 30)
-
-                Text(goalHoursText)
-                    .font(.system(.subheadline, design: .rounded, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                Spacer(minLength: 8)
-
-                Text("Change in Settings")
-                    .font(.system(.caption, design: .rounded, weight: .medium))
-                    .foregroundStyle(Color.lavendar.opacity(0.65))
-                    .lineLimit(1)
-            }
         }
         .padding(20)
         .nightCard(cornerRadius: 30, tint: Color.dreamPurple, elevated: true)
+        .accessibilityElement(children: .combine)
     }
 
     private var summaryCaption: String {
@@ -375,6 +311,17 @@ struct ProgressView: View {
         }
         .padding(20)
         .nightCard(cornerRadius: 30)
+    }
+
+    private var chartAccessibilityValue: String {
+        guard !points.isEmpty else { return "No check-ins in this range." }
+
+        let details = points.suffix(7).map { point in
+            "\(point.day.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())): score \(point.score), \(Int(point.hours * 60).durationText)"
+        }
+
+        let average = averageScore.map { "Average score \($0)." } ?? ""
+        return "\(points.count) check-ins. \(average) " + details.joined(separator: ". ")
     }
 
     private var displayedPoint: SleepPoint? {
@@ -411,7 +358,7 @@ struct ProgressView: View {
             if let displayed = displayedPoint {
                 VStack(alignment: .trailing, spacing: 0) {
                     Text("\(displayed.score)")
-                        .font(.system(size: 38, weight: .heavy, design: .rounded))
+                        .scaledFont(size: 38, weight: .heavy, design: .rounded)
                         .monospacedDigit()
                         .foregroundStyle(ScoreTone.color(for: displayed.score))
                         .contentTransition(.numericText(value: Double(displayed.score)))
@@ -430,15 +377,6 @@ struct ProgressView: View {
 
     private var chartView: some View {
         Chart {
-            RuleMark(y: .value("Goal", goalScore))
-                .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                .foregroundStyle(Color.starlightGold.opacity(0.5))
-                .annotation(position: .top, alignment: .leading, spacing: 2) {
-                    Text("Goal \(goalScore)")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.starlightGold.opacity(0.95))
-                }
-
             ForEach(points) { point in
                 if points.count > 1 {
                     AreaMark(
@@ -499,6 +437,8 @@ struct ProgressView: View {
         .chartXScale(domain: windowStart...windowEnd)
         .chartYScale(domain: 0...100)
         .chartXSelection(value: $selectedDate)
+        .accessibilityLabel("Sleep score trend, \(selectedRange.subtitle)")
+        .accessibilityValue(chartAccessibilityValue)
         .chartXAxis {
             AxisMarks(values: axisDates) { _ in
                 AxisValueLabel(format: selectedRange.axisFormat)
@@ -513,7 +453,7 @@ struct ProgressView: View {
                 AxisValueLabel {
                     if let intValue = value.as(Int.self) {
                         Text("\(intValue)")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .scaledFont(size: 10, weight: .bold, design: .rounded)
                             .foregroundStyle(Color.lavendar.opacity(0.6))
                     }
                 }
@@ -540,13 +480,13 @@ struct ProgressView: View {
                 .padding(.horizontal, 24)
             }
         }
-        .sensoryFeedback(.selection, trigger: selectedPoint?.id)
+        .haptic(.scrub, trigger: selectedPoint?.id)
         .animation(.snappy, value: selectedRange)
     }
 
     private func pointColor(for point: SleepPoint) -> Color {
         if selectedPoint?.id == point.id { return Color.starlightGold }
-        return point.score >= goalScore ? Color.restfulMint : Color.white
+        return Color.white
     }
 
     private var rangeSelector: some View {
@@ -557,8 +497,10 @@ struct ProgressView: View {
 
                 Button {
                     if isLocked {
+                        Haptics.play(.warning)
                         showProSheet = true
                     } else {
+                        Haptics.play(.tab)
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             selectedRange = range
                             selectedDate = nil
@@ -606,7 +548,7 @@ struct ProgressView: View {
     // MARK: - Stats
 
     private var statsRow: some View {
-        HStack(spacing: 12) {
+        AdaptiveStack(spacing: 12, verticalAlignment: .top, horizontalAlignment: .center) {
             statTile(
                 icon: "bed.double.fill",
                 tint: Color.moonlightBlue,
@@ -620,31 +562,36 @@ struct ProgressView: View {
                 value: streak == 0 ? "–" : "\(streak) day\(streak == 1 ? "" : "s")",
                 label: "Streak"
             )
-
-            statTile(
-                icon: "waveform.path.ecg",
-                tint: Color.restfulMint,
-                value: consistencyText,
-                label: "Consistency"
-            )
         }
     }
 
-    private func statTile(icon: String, tint: Color, value: String, label: LocalizedStringKey) -> some View {
+    private func statTile(icon: String,
+                          tint: Color,
+                          value: String,
+                          label: LocalizedStringKey,
+                          detail: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             RowIcon(systemName: icon, size: 32, tint: tint)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(value)
                     .font(.system(.headline, design: .rounded, weight: .heavy))
                     .foregroundStyle(.white)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .minimumScaleFactor(0.65)
 
                 Text(label)
                     .font(.system(.caption, design: .rounded, weight: .medium))
                     .foregroundStyle(Color.lavendar.opacity(0.75))
-                    .lineLimit(1)
+                    .lineLimit(2)
+
+                if let detail {
+                    Text(detail)
+                        .font(.system(.caption2, design: .rounded, weight: .semibold))
+                        .foregroundStyle(tint)
+                        .lineLimit(2)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -658,32 +605,43 @@ struct ProgressView: View {
     @ViewBuilder
     private var factorsSection: some View {
         if !checkIns.isEmpty {
-            let impacts = factorImpacts
-            let isLocked = !impacts.isEmpty && !proManager.isPro
+            let factors = commonFactors
+            let isLocked = !factors.isEmpty && !proManager.isPro
 
             VStack(alignment: .leading, spacing: 14) {
                 SectionTitle("What shapes your sleep", showsPro: true)
 
-                if impacts.isEmpty {
-                    Text("Log a few more check-ins and tag what shaped each night. Snoozly will show which habits raise or lower your score.")
+                if factors.isEmpty {
+                    Text(factorsEmptyMessage)
                         .font(.system(.footnote, design: .rounded))
                         .foregroundStyle(Color.lavendar.opacity(0.8))
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
-                    VStack(spacing: 12) {
-                        ForEach(impacts) { impact in
-                            factorRow(impact)
+                    VStack(spacing: 14) {
+                        ForEach(Array(factors.enumerated()), id: \.element.id) { index, item in
+                            if index > 0 {
+                                Divider()
+                                    .overlay(Color.white.opacity(0.08))
+                            }
+                            factorRow(item)
                         }
                     }
-                    .blur(radius: isLocked ? 6 : 0)
+                    .blur(radius: isLocked ? 4 : 0)
+                    .accessibilityHidden(isLocked)
                     .overlay {
                         if isLocked {
-                            Label("Unlock with Pro", systemImage: "lock.fill")
-                                .font(.system(.subheadline, design: .rounded, weight: .bold))
-                                .foregroundStyle(Color.starlightGold)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .glassEffect(.regular.interactive(), in: Capsule())
+                            Button {
+                                showProSheet = true
+                            } label: {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(Color.starlightGold)
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Unlock with Pro")
+                            .accessibilityHint("Opens Snoozly Pro to reveal what shapes your sleep")
                         }
                     }
                 }
@@ -700,32 +658,50 @@ struct ProgressView: View {
         }
     }
 
-    private func factorRow(_ impact: FactorImpact) -> some View {
-        let isPositive = impact.delta > 0
-        let tint = isPositive ? Color.restfulMint : Color.dreamCoral
+    private var factorsEmptyMessage: String {
+        let recent = Array(checkIns.prefix(60))
 
-        return HStack(spacing: 12) {
-            RowIcon(systemName: impact.factor.icon, size: 38, tint: Color.starlightGold)
+        if recent.allSatisfy({ $0.factors.isEmpty }) {
+            return "Tag what shaped your night, like late screens or caffeine, when you check in. Snoozly will highlight your most common habits and things to work on."
+        }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(impact.factor.rawValue)
-                    .font(.system(.callout, design: .rounded, weight: .bold))
-                    .foregroundStyle(.white)
+        return "Tag what shaped your night when checking in to see your common habits and what to work on."
+    }
 
-                Text("Logged on \(impact.count) nights")
-                    .font(.system(.footnote, design: .rounded))
-                    .foregroundStyle(Color.lavendar.opacity(0.7))
+    private func factorRow(_ insight: FactorInsight) -> some View {
+        let isDisruptor = insight.factor.isDisruptor
+        let tagColor = isDisruptor ? Color.dreamCoral : Color.restfulMint
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                RowIcon(systemName: insight.factor.icon, size: 38, tint: Color.starlightGold)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(insight.factor.rawValue)
+                        .font(.system(.callout, design: .rounded, weight: .bold))
+                        .foregroundStyle(.white)
+
+                    Text("Logged on \(insight.count) night\(insight.count == 1 ? "" : "s")")
+                        .font(.system(.footnote, design: .rounded))
+                        .foregroundStyle(Color.lavendar.opacity(0.75))
+                }
+
+                Spacer()
+
+                Text(insight.factor.tagText)
+                    .font(.system(.caption, design: .rounded, weight: .bold))
+                    .foregroundStyle(tagColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(tagColor.opacity(0.14)))
             }
 
-            Spacer()
-
-            Text("\(isPositive ? "+" : "−")\(abs(impact.delta)) pts")
-                .font(.system(.subheadline, design: .rounded, weight: .heavy))
-                .monospacedDigit()
-                .foregroundStyle(tint)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(tint.opacity(0.14)))
+            Text(insight.factor.tip)
+                .font(.system(.footnote, design: .rounded))
+                .foregroundStyle(Color.lavendar.opacity(0.75))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 50)
         }
     }
 

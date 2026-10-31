@@ -16,6 +16,7 @@ enum AppStorageKey {
     static let isPro = "isPro"
     static let sleepGoalMinutes = "sleepGoalMinutes"
     static let skipDateString = "skipDateString"
+    static let lastCheckInPromptDay = "lastCheckInPromptDay"
     static let firstLaunchDate = "firstLaunchDate"
     static let launchCount = "launchCount"
     static let lastReviewPromptDate = "lastReviewPromptDate"

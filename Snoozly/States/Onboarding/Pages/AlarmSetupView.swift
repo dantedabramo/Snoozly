@@ -135,7 +135,7 @@ struct AlarmSetupView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .nightCard(cornerRadius: 28)
-        .sensoryFeedback(.selection, trigger: plan.snoozeMinutes)
+        .haptic(.select, trigger: plan.snoozeMinutes)
     }
 
     private func snoozeTile(_ minutes: Int) -> some View {

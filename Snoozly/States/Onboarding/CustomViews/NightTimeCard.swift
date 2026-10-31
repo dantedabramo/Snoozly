@@ -60,8 +60,8 @@ struct NightTimeCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .nightCard(cornerRadius: 28)
         .animation(.spring(response: 0.45, dampingFraction: 0.8), value: isEnabled)
-        .sensoryFeedback(.selection, trigger: minutes)
-        .sensoryFeedback(.success, trigger: applyCount)
+        .haptic(.scrub, trigger: minutes)
+        .haptic(.celebrate, trigger: applyCount)
     }
 
     // MARK: - Header

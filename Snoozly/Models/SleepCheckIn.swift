@@ -150,6 +150,40 @@ enum SleepFactor: String, CaseIterable, Identifiable {
         case .nap: "moon.zzz.fill"
         }
     }
+
+    var isDisruptor: Bool {
+        switch self {
+        case .caffeine, .lateScreens, .alcohol, .stress, .lateMeal, .nap:
+            return true
+        case .exercise, .reading:
+            return false
+        }
+    }
+
+    var tagText: String {
+        isDisruptor ? "Work on this" : "Healthy habit"
+    }
+
+    var tip: String {
+        switch self {
+        case .lateScreens:
+            return "Try setting screens aside 30 minutes before bed."
+        case .caffeine:
+            return "Consider keeping caffeine to the earlier part of your day."
+        case .alcohol:
+            return "Alcohol can fragment sleep and reduce REM rest later in the night."
+        case .stress:
+            return "A wind-down routine or journaling can help clear your head."
+        case .lateMeal:
+            return "Giving digestion 2–3 hours before sleep helps your body rest."
+        case .nap:
+            return "Keep daytime naps brief (under 30 min) so they don't delay bedtime."
+        case .exercise:
+            return "Regular physical activity supports deeper, more restorative rest."
+        case .reading:
+            return "Reading with soft, warm light is a natural cue for sleep."
+        }
+    }
 }
 
 // MARK: - SleepScoring
